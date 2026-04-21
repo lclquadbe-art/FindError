@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>세트·부품 파일 검증 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --accent: #4f7ef8;
+    --accent2: #7c5cfc;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --err: #ef4444;
+    --text: #e8ecf4;
+    --muted: #7b82a0;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    font-size: 14px; min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(135deg, var(--surface) 0%, #1e2235 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px; display: flex; align-items: center; gap: 16px;
+  }
+  header .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
+
+  .steps {
+    display: flex; margin-bottom: 28px;
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); overflow: hidden;
+  }
+  .step-btn {
+    flex: 1; padding: 14px 8px; border: none; background: transparent;
+    color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 600;
+    border-right: 1px solid var(--border); transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .step-btn:last-child { border-right: none; }
+  .step-btn.active { background: var(--accent); color: #fff; }
+  .step-btn .num {
+    width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,.15);
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+  }
+  .step-btn.done { color: var(--ok); }
+  .step-btn.done .num { background: var(--ok); color: #000; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+  }
+  .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card h3 .tag {
+    font-size: 10px; padding: 2px 8px; border-radius: 20px;
+    background: rgba(79,126,248,.2); color: var(--accent); font-weight: 600;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 8px;
+    padding: 48px 20px; text-align: center; cursor: pointer;
+    transition: all .2s; background: var(--bg);
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(79,126,248,.06); }
+  .drop-zone .icon { font-size: 44px; margin-bottom: 12px; }
+  .drop-zone p { color: var(--muted); font-size: 13px; }
+  .drop-zone strong { color: var(--text); }
+  .drop-zone small { display: block; margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.8; }
+  .drop-zone input { display: none; }
+
+  /* AUTO-CLASSIFY BINS */
+  .bins { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; margin-top: 18px; }
+  @media(max-width:1000px){ .bins { grid-template-columns: repeat(4,1fr); } }
+  @media(max-width:600px) { .bins { grid-template-columns: repeat(2,1fr); } }
+
+  .bin {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px;
+  }
+  .bin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .bin-label { font-size: 10px; font-weight: 700; color: var(--muted); }
+  .bin-count {
+    font-size: 12px; font-weight: 700; padding: 1px 7px;
+    border-radius: 20px; background: var(--surface2); color: var(--muted);
+  }
+  .bin-count.has { background: rgba(79,126,248,.2); color: var(--accent); }
+  .bin-files { display: flex; flex-direction: column; gap: 3px; max-height: 160px; overflow-y: auto; }
+  .bin-file {
+    font-size: 10px; color: var(--muted); padding: 3px 6px;
+    background: var(--surface); border-radius: 4px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .bin-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex:1; }
+  .bin-file button { background:none; border:none; color:var(--muted); cursor:pointer; font-size:12px; flex-shrink:0; }
+  .bin-file button:hover { color: var(--err); }
+  .bin-empty { font-size: 10px; color: var(--border); text-align:center; padding: 8px 0; }
+
+  /* progress */
+  #classify-prog {
+    display:none; align-items:center; gap:10px;
+    margin-top:12px; font-size:12px; color:var(--muted);
+  }
+  .spinner {
+    width:14px; height:14px; border:2px solid rgba(255,255,255,.15);
+    border-top-color: var(--accent); border-radius:50%;
+    animation: spin .6s linear infinite; flex-shrink:0;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* file list (step1) */
+  .file-list { margin-top: 12px; display:flex; flex-direction:column; gap:6px; }
+  .file-item {
+    display:flex; align-items:center; gap:10px;
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:6px; padding:8px 12px;
+  }
+  .file-item .ext {
+    font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;
+    min-width:44px; text-align:center; background:var(--surface2); color:var(--muted);
+  }
+  .file-item .fname { flex:1; font-size:12px; word-break:break-all; }
+  .file-item .fsize { color:var(--muted); font-size:11px; white-space:nowrap; }
+
+  /* table */
+  .result-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th {
+    background:var(--surface2); color:var(--muted); font-weight:600;
+    padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  td { padding:8px 10px; border-bottom:1px solid #1e2235; vertical-align:middle; }
+  tr:hover td { background:rgba(255,255,255,.02); }
+
+  .badge {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap;
+  }
+  .badge.ok   { background:rgba(34,197,94,.15);  color:var(--ok);   }
+  .badge.warn { background:rgba(245,158,11,.15); color:var(--warn); }
+  .badge.err  { background:rgba(239,68,68,.15);  color:var(--err);  }
+
+  .summary-bar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+  .stat-box {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:12px 18px; min-width:100px;
+  }
+  .stat-box .val { font-size:26px; font-weight:700; line-height:1; }
+  .stat-box .lbl { font-size:11px; color:var(--muted); margin-top:4px; }
+  .stat-box.ok   .val { color:var(--ok);   }
+  .stat-box.warn .val { color:var(--warn); }
+  .stat-box.err  .val { color:var(--err);  }
+
+  .btn {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:10px 20px; border-radius:8px; border:none;
+    font-size:13px; font-weight:600; cursor:pointer; transition:all .2s;
+  }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-primary:hover { background:#3a67e8; }
+  .btn-secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+  .btn-secondary:hover { background:var(--border); }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+  .actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+
+  .notice {
+    padding:12px 14px; border-radius:8px; font-size:13px;
+    display:flex; align-items:flex-start; gap:10px; margin-bottom:14px;
+    line-height:1.6;
+  }
+  .notice.info    { background:rgba(79,126,248,.1);  border:1px solid rgba(79,126,248,.3); }
+  .notice.success { background:rgba(34,197,94,.1);   border:1px solid rgba(34,197,94,.3);  color:var(--ok);  }
+  .notice.danger  { background:rgba(239,68,68,.1);   border:1px solid rgba(239,68,68,.3);  color:var(--err); }
+
+  .empty { text-align:center; color:var(--muted); padding:32px; font-size:13px; }
+  .chip {
+    display:inline-block; padding:1px 7px; border-radius:12px;
+    font-size:10px; font-weight:600; margin:1px;
+    background:var(--surface2); color:var(--muted); border:1px solid var(--border);
+  }
+  /* 오류 필터 토글 활성 상태 */
+  #filter-toggle.active {
+    background: rgba(239,68,68,.15);
+    border-color: var(--err);
+    color: var(--err);
+  }
+  /* 필터 모드: 오류 없는 세트 카드 숨김 */
+  .result-card.no-error.filter-hidden { display: none; }
+
+  .chasu-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 18px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600;
+    background: var(--surface2); border: 2px solid var(--border);
+    color: var(--muted); transition: all .15s; user-select: none;
+  }
+  .chasu-label:has(input:checked) {
+    background: rgba(79,126,248,.15); border-color: var(--accent); color: var(--text);
+  }
+  .chasu-label input { display: none; }
+
+  code {
+    background:var(--surface2); padding:1px 5px; border-radius:4px;
+    font-size:11px; font-family:monospace;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📦</div>
+  <div>
+    <h1>세트·부품 파일 검증 시스템</h1>
+    <p>세트-부품 리스트 엑셀 기반 파일 완성도 자동 검사</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="steps">
+    <button class="step-btn active" id="tab1" onclick="goStep(1)"><span class="num">1</span> 리스트 엑셀</button>
+    <button class="step-btn"        id="tab2" onclick="goStep(2)"><span class="num">2</span> 파일 업로드</button>
+    <button class="step-btn"        id="tab3" onclick="goStep(3)"><span class="num">3</span> 검증 결과</button>
+  </div>
+
+  <!-- ══ STEP 1 ══ -->
+  <div class="panel active" id="panel1">
+    <div class="card">
+      <h3>① 세트-부품 리스트 엑셀 <span class="tag">필수</span></h3>
+      <div class="notice info">
+        <span>ℹ️</span>
+        <div>
+          <b>3D 데이터 레이어명</b> 컬럼의 <code>A####_코드</code> 값을 기준으로 세트·부품을 자동 파싱합니다.<br>
+          예시 파일 형식(세트-제품_예시엑셀.xlsx)을 그대로 사용하세요.
+        </div>
+      </div>
+      <div class="drop-zone" id="dz1"
+           onclick="document.getElementById('inp1').click()"
+           ondragover="dzOver(event,'dz1')" ondragleave="dzLeave('dz1')"
+           ondrop="e=>{e.preventDefault();dzLeave('dz1');handleListExcel(e.dataTransfer.files)}">
+        <div class="icon">📊</div>
+        <p><strong>클릭하거나 파일을 드래그</strong></p>
+        <p style="margin-top:4px">세트-부품 리스트 .xlsx</p>
+        <input type="file" id="inp1" accept=".xlsx,.xls" onchange="handleListExcel(this.files)">
+      </div>
+      <div id="list1" class="file-list"></div>
+      <div id="chasu-select" style="display:none; margin-top:16px;">
+        <div style="font-size:12px; font-weight:700; color:var(--muted); margin-bottom:10px;">차수 선택 <span style="font-weight:400; color:var(--muted)">(포함할 차수를 선택하세요)</span></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <label class="chasu-label" id="cl-1">
+            <input type="checkbox" value="1" onchange="onChasuChange()" checked> 1차
+          </label>
+          <label class="chasu-label" id="cl-2">
+            <input type="checkbox" value="2" onchange="onChasuChange()" checked> 2차
+          </label>
+          <label class="chasu-label" id="cl-3">
+            <input type="checkbox" value="3" onchange="onChasuChange()" checked> 3차
+          </label>
+        </div>
+      </div>
+    </div>
+    <div id="parsed-preview" style="display:none">
+      <div class="card">
+        <h3>파싱된 세트·부품 목록</h3>
+        <div id="preview-content"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="goStep(2)" id="next1" disabled>다음 단계 →</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 2 ══ -->
+  <div class="panel" id="panel2">
+    <div class="card">
+      <h3>② 파일 일괄 업로드 <span class="tag">자동 분류</span></h3>
+      <div class="notice info">
+        <span>📌</span>
+        <div>
+          <b>파일명 패턴으로 자동 분류됩니다.</b><br>
+          • <code>A1234.png</code> → <b>세트 이미지</b> (숫자 바로 뒤에 .png)<br>
+          • <code>A1234_NAME.png</code> → 부품 PNG, 픽셀 크기로 구분: ≤160px → PNG160 &nbsp;/&nbsp; ≤350px → PNG300 &nbsp;/&nbsp; 나머지 → PNG500<br>
+          • <code>A1234_NAME_measure.xlsx</code> → 부품 엑셀<br>
+          • <code>A1234_NAME.unity3d</code> → Unity3D
+        </div>
+      </div>
+
+      <!-- SINGLE DROP ZONE -->
+      <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <button class="btn btn-secondary" style="flex:1; justify-content:center;"
+                onclick="document.getElementById('inp-folder').click()">
+          📁 폴더 선택
+        </button>
+        <button class="btn btn-secondary" style="flex:1; justify-content:center;"
+                onclick="document.getElementById('inp-all').click()">
+          🗂 파일 직접 선택
+        </button>
+      </div>
+      <div class="drop-zone" id="dz-all"
+           ondragover="dzOver(event,'dz-all')" ondragleave="dzLeave('dz-all')"
+           ondrop="handleDrop(event)">
+        <div class="icon">📂</div>
+        <p><strong>폴더 또는 파일을 여기에 드래그</strong></p>
+        <small>
+          폴더째로 드래그하거나 위 버튼으로 선택하세요<br>
+          PNG (세트이미지·160·300·500) + _measure.xlsx + .unity3d 자동 분류
+        </small>
+        <input type="file" id="inp-folder" webkitdirectory multiple
+               onchange="handleAllFiles(this.files)">
+        <input type="file" id="inp-all" multiple
+               accept=".png,.jpg,.jpeg,.xlsx,.xls,.unity3d"
+               onchange="handleAllFiles(this.files)">
+      </div>
+
+      <div id="classify-prog">
+        <span class="spinner"></span>
+        <span id="classify-msg">분류 중...</span>
+      </div>
+
+      <!-- BINS -->
+      <div class="bins">
+        <div class="bin">
+          <div class="bin-header"><span class="bin-label">🗂 세트이미지</span><span class="bin-count" id="cnt-setimg">0</span></div>
+          <div class="bin-files" id="bfiles-setimg"><div class="bin-empty">없음</div></div>
+        </div>
+        <div class="bin">
+          <div class="bin-header"><span class="bin-label">🖼 PNG160</span><span class="bin-count" id="cnt-png160">0</span></div>
+          <div class="bin-files" id="bfiles-png160"><div class="bin-empty">없음</div></div>
+        </div>
+        <div class="bin">
+          <div class="bin-header"><span class="bin-label">🖼 PNG300</span><span class="bin-count" id="cnt-png300">0</span></div>
+          <div class="bin-files" id="bfiles-png300"><div class="bin-empty">없음</div></div>
+        </div>
+        <div class="bin">
+          <div class="bin-header"><span class="bin-label">🖼 PNG500</span><span class="bin-count" id="cnt-png500">0</span></div>
+          <div class="bin-files" id="bfiles-png500"><div class="bin-empty">없음</div></div>
+        </div>
+        <div class="bin">
+          <div class="bin-header"><span class="bin-label">📊 Excel</span><span class="bin-count" id="cnt-excel">0</span></div>
+          <div class="bin-files" id="bfiles-excel"><div class="bin-empty">없음</div></div>
+        </div>
+        <div class="bin">
+          <div class="bin-header"><span class="bin-label">🎮 Unity3D</span><span class="bin-count" id="cnt-unity3d">0</span></div>
+          <div class="bin-files" id="bfiles-unity3d"><div class="bin-empty">없음</div></div>
+        </div>
+        <div class="bin">
+          <div class="bin-header"><span class="bin-label">❓ 미분류</span><span class="bin-count" id="cnt-unknown">0</span></div>
+          <div class="bin-files" id="bfiles-unknown"><div class="bin-empty">없음</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="goStep(1)">← 이전</button>
+      <button class="btn btn-primary" onclick="runValidation()">🔍 검증 실행</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 3 ══ -->
+  <div class="panel" id="panel3">
+    <div id="result-toolbar" style="display:none; margin-bottom:14px; display:none; align-items:center; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-secondary" id="filter-toggle" onclick="toggleErrFilter()">
+        🔴 오류만 보기
+      </button>
+      <span id="filter-status" style="font-size:12px; color:var(--muted);"></span>
+    </div>
+    <div id="result-area"><div class="empty">검증을 실행하면 결과가 표시됩니다.</div></div>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="goStep(2)">← 파일 수정</button>
+      <button class="btn btn-primary" onclick="exportReport()">📥 리포트 내보내기</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+const S = {
+  sets: [],
+  rawRows: null,   // 엑셀 원본 rows 저장 (차수 변경 시 재파싱용)
+  files: { setimg:[], png160:[], png300:[], png500:[], excel:[], unity3d:[], unknown:[] }
+};
+
+// ─── NAV ─────────────────────────────────────────────────
+function goStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('panel'+i).classList.toggle('active', i===n);
+    document.getElementById('tab'+i).classList.toggle('active', i===n);
+  });
+}
+
+// ─── DND HELPERS ─────────────────────────────────────────
+function dzOver(e,id) { e.preventDefault(); document.getElementById(id).classList.add('dragover'); }
+function dzLeave(id)  { document.getElementById(id).classList.remove('dragover'); }
+
+// ─── STEP 1: LIST EXCEL ──────────────────────────────────
+function handleListExcel(files) {
+  if (!files?.length) return;
+  const f = files[0];
+  document.getElementById('list1').innerHTML = `
+    <div class="file-item">
+      <span class="ext" style="color:#22c55e">XLSX</span>
+      <span class="fname">${f.name}</span>
+      <span class="fsize">${fmtSize(f.size)}</span>
+    </div>`;
+  document.getElementById('chasu-select').style.display = 'block';
+  const r = new FileReader();
+  r.onload = e => {
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+    S.rawRows = rows;
+    parseListRows(rows);
+  };
+  r.readAsArrayBuffer(f);
+}
+
+function getSelectedChasu() {
+  const checked = [...document.querySelectorAll('#chasu-select input:checked')].map(el => el.value);
+  return new Set(checked.length ? checked : ['1','2','3']);
+}
+
+function onChasuChange() {
+  if (S.rawRows) parseListRows(S.rawRows);
+}
+
+function parseListRows(rows) {
+  // 헤더 2행(row0, row1) 스킵 → 데이터는 row2부터
+  // col2 = 차수, col3 = 도면번호(세트코드), col14 = 부품코드
+  // 차수가 1,2,3 인 행만 처리
+  // 도면번호는 값이 있을 때만 갱신 (병합셀처럼 빈 경우 이전 값 유지)
+
+  const COL_CHASU   = 2;
+  const COL_SETCODE = 3;
+  const COL_PARTCODE = 8;  // col8: 제품 코드 = 부품코드
+  const VALID_CHASU = getSelectedChasu();
+
+  const sets = {};       // setCode → [partCode, ...]
+  const setOrder = [];   // 순서 유지
+  let currentSet = null;
+
+  // XLSX.js 빈 셀 = undefined → 'undefined' 문자열 방지
+  const cv = (row, col) => {
+    const v = row[col];
+    if (v === null || v === undefined) return '';
+    const s = String(v).trim();
+    return (s === 'nan' || s === 'undefined' || s === 'null') ? '' : s;
+  };
+
+  for (let r = 2; r < rows.length; r++) {   // 헤더 2행 스킵
+    const row      = rows[r];
+    const chasu    = cv(row, COL_CHASU);
+    const setCode  = cv(row, COL_SETCODE);
+    const partCode = cv(row, COL_PARTCODE);
+
+    // 차수 필터: 1,2,3 만
+    if (!VALID_CHASU.has(chasu)) continue;
+
+    // 도면번호: 값 있으면 갱신, 없으면 이전 값 유지 (forward-fill)
+    if (setCode) {
+      currentSet = setCode.toUpperCase();
+      if (!sets[currentSet]) {
+        sets[currentSet] = [];
+        setOrder.push(currentSet);
+      }
+    }
+
+    // 부품코드 추가 (col8 제품 코드)
+    if (partCode && currentSet) {
+      const pc = partCode.toUpperCase();
+      if (!sets[currentSet].includes(pc)) sets[currentSet].push(pc);
+    }
+  }
+
+  S.sets = setOrder.map(setCode => ({ setCode, parts: sets[setCode] }));
+
+  // Render preview
+  const total = S.sets.reduce((s,x) => s+x.parts.length, 0);
+  const uniqueTotal = new Set(S.sets.flatMap(s => s.parts)).size;
+
+  // 세트 내 중복 찾기
+  const dupeSets = [];
+  S.sets.forEach(({setCode, parts}) => {
+    const seen = {}, dupes = [];
+    parts.forEach(p => { seen[p] = (seen[p]||0)+1; });
+    Object.entries(seen).forEach(([p,cnt]) => { if(cnt>1) dupes.push(`${p}(${cnt}회)`); });
+    if (dupes.length) dupeSets.push({setCode, dupes});
+  });
+
+  let html = S.sets.length
+    ? `<div class="notice success">✅ ${S.sets.length}개 세트, 총 ${uniqueTotal}개 부품 코드 (고유) 파싱 완료</div>`
+    : `<div class="notice danger">⚠️ 코드를 파싱하지 못했습니다. 엑셀 형식을 확인해 주세요.</div>`;
+
+  if (dupeSets.length) {
+    html += `<div class="notice danger">⚠️ 세트 내 중복 제품코드 발견 — ${dupeSets.length}개 세트<br>`;
+    dupeSets.forEach(({setCode, dupes}) => {
+      html += `<b>${setCode}</b>: ${dupes.join(', ')}<br>`;
+    });
+    html += `</div>`;
+  }
+
+  if (S.sets.length) {
+    html += '<div class="result-wrap"><table><thead><tr><th>세트코드</th><th>부품 목록</th><th>부품 수</th></tr></thead><tbody>';
+    S.sets.forEach(({setCode, parts}) => {
+      const hasDupe = dupeSets.some(d => d.setCode === setCode);
+      const rowStyle = hasDupe ? ' style="background:rgba(239,68,68,.06)"' : '';
+      const dupeBadge = hasDupe ? ' <span class="badge err">중복</span>' : '';
+      html += `<tr${rowStyle}><td><b>${setCode}</b>${dupeBadge}</td><td>${parts.map(p=>`<span class="chip">${p}</span>`).join('')}</td><td>${parts.length}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  document.getElementById('preview-content').innerHTML = html;
+  document.getElementById('parsed-preview').style.display = 'block';
+  document.getElementById('next1').disabled = S.sets.length === 0;
+}
+
+// ─── STEP 2: FILE UPLOAD + AUTO-CLASSIFY ─────────────────
+
+// Regex patterns
+const RE_SET_IMG  = /^[A-Z]\d{3,5}\.(png|jpg|jpeg)$/i;   // A1234.png  (no underscore)
+const RE_PART_PNG = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.(png|jpg|jpeg)$/i;
+const RE_EXCEL    = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.(xlsx|xls)$/i;
+const RE_UNITY    = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.unity3d$/i;
+
+function getImgSize(file) {
+  return new Promise(res => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); res(Math.max(img.naturalWidth, img.naturalHeight)); };
+    img.onerror = () => { URL.revokeObjectURL(url); res(0); };
+    img.src = url;
+  });
+}
+
+// 폴더 드래그 시 DataTransferItem에서 재귀적으로 파일 수집
+async function getFilesFromEntry(entry) {
+  return new Promise(resolve => {
+    if (entry.isFile) {
+      entry.file(f => resolve([f]), () => resolve([]));
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const allEntries = [];
+      const readAll = () => {
+        reader.readEntries(async batch => {
+          if (!batch.length) {
+            const nested = await Promise.all(allEntries.map(getFilesFromEntry));
+            resolve(nested.flat());
+          } else {
+            allEntries.push(...batch);
+            readAll();
+          }
+        }, () => resolve([]));
+      };
+      readAll();
+    } else {
+      resolve([]);
+    }
+  });
+}
+
+async function handleAllFiles(fileList) {
+  if (!fileList?.length) return;
+  const files = Array.from(fileList);
+  const prog = document.getElementById('classify-prog');
+  const msg  = document.getElementById('classify-msg');
+  prog.style.display = 'flex';
+  msg.textContent = '파일 목록 수집 중...';
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const name = f.name;
+    msg.textContent = `${i+1} / ${files.length}  ·  ${name}`;
+
+    if (RE_SET_IMG.test(name)) {
+      S.files.setimg.push(f);
+    } else if (RE_PART_PNG.test(name)) {
+      const maxPx = await getImgSize(f);
+      if (maxPx <= 160)      S.files.png160.push(f);
+      else if (maxPx <= 350) S.files.png300.push(f);
+      else                   S.files.png500.push(f);
+    } else if (RE_EXCEL.test(name)) {
+      S.files.excel.push(f);
+    } else if (RE_UNITY.test(name)) {
+      S.files.unity3d.push(f);
+    } else {
+      S.files.unknown.push(f);
+    }
+  }
+
+  prog.style.display = 'none';
+  refreshBins();
+}
+
+// 드롭 이벤트 - 폴더 드래그 지원
+async function handleDrop(e) {
+  e.preventDefault();
+  dzLeave('dz-all');
+  const prog = document.getElementById('classify-prog');
+  const msg  = document.getElementById('classify-msg');
+  prog.style.display = 'flex';
+  msg.textContent = '파일 목록 수집 중...';
+
+  let files = [];
+  const items = [...(e.dataTransfer.items || [])];
+  if (items.length && items[0].webkitGetAsEntry) {
+    // 폴더 포함 드래그 처리
+    const entries = items.map(i => i.webkitGetAsEntry()).filter(Boolean);
+    const nested  = await Promise.all(entries.map(getFilesFromEntry));
+    files = nested.flat();
+  } else {
+    files = Array.from(e.dataTransfer.files);
+  }
+
+  prog.style.display = 'none';
+  await handleAllFiles(files);
+}
+
+function refreshBins() {
+  const keys = ['setimg','png160','png300','png500','excel','unity3d','unknown'];
+  keys.forEach(key => {
+    const arr = S.files[key];
+    const cnt = document.getElementById('cnt-'+key);
+    const lst = document.getElementById('bfiles-'+key);
+    if (!cnt||!lst) return;
+    cnt.textContent = arr.length;
+    cnt.className   = 'bin-count' + (arr.length ? ' has' : '');
+    lst.innerHTML   = arr.length
+      ? arr.map((f,i) => `<div class="bin-file"><span title="${f.name}">${f.name}</span><button onclick="removeBin('${key}',${i})">×</button></div>`).join('')
+      : '<div class="bin-empty">없음</div>';
+  });
+}
+
+function removeBin(key, idx) {
+  S.files[key].splice(idx, 1);
+  refreshBins();
+}
+
+// ─── VALIDATION ──────────────────────────────────────────
+const FTYPES = [
+  {key:'png160', label:'PNG160'},
+  {key:'png300', label:'PNG300'},
+  {key:'png500', label:'PNG500'},
+  {key:'excel',  label:'EXCEL'},
+  {key:'unity3d',label:'UNITY3D'},
+];
+
+function codeFromFile(f) {
+  // _measure 제거 후 코드 추출 (있어도 없어도 동일하게 처리)
+  const name = f.name.replace(/_measure\./i, '.').replace(/_measure$/i, '');
+  const m = name.match(/^([A-Z]\d{3,5}_[A-Za-z0-9_]+?)(?:\.|_measure)/i)
+         || name.match(/^([A-Z]\d{3,5}_[A-Za-z0-9_]+)/i);
+  return m ? m[1].toUpperCase() : null;
+}
+function fmtSize(b) {
+  return b>1<<20 ? (b>>20)+'MB' : b>1024 ? Math.round(b/1024)+'KB' : b+'B';
+}
+
+async function runValidation() {
+  if (!S.sets.length) { alert('세트-부품 리스트 엑셀을 먼저 업로드하세요.'); return; }
+
+  // File lookup: CODE → {key:File}
+  const lookup = {};
+  FTYPES.forEach(({key}) => {
+    S.files[key].forEach(f => {
+      const c = codeFromFile(f);
+      if (!c) return;
+      if (!lookup[c]) lookup[c] = {};
+      lookup[c][key] = f;
+    });
+  });
+
+  // Set image lookup: A#### → File
+  const setImgMap = {};
+  S.files.setimg.forEach(f => {
+    const m = f.name.match(/^([A-Z]\d{3,5})\./i);
+    if (m) setImgMap[m[1].toUpperCase()] = f;
+  });
+
+  // Read & validate excel files
+  const excelData = {};
+  await Promise.all(S.files.excel.map(f => new Promise(res => {
+    const code = codeFromFile(f);
+    if (!code) return res();
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+        excelData[code] = checkExcel(code, rows);
+      } catch(err) {
+        excelData[code] = {errors:['읽기 실패: '+err.message], warnings:[]};
+      }
+      res();
+    };
+    r.readAsArrayBuffer(f);
+  })));
+
+  // Build result rows
+  // 세트는 452개 그대로 유지, 부품은 세트별로 모두 표시
+  // 단 요약 통계(전체 부품 수)는 고유 부품코드 기준으로 표시
+  const results = [];
+  S.sets.forEach(({setCode, parts}) => {
+    const pfx = (setCode.match(/^([A-Z]\d{3,5})/i)||[])[1]?.toUpperCase();
+    const hasSetImg = !!(setImgMap[pfx] || setImgMap[setCode.toUpperCase()]);
+
+    parts.forEach(partCode => {
+      const pKey = partCode.toUpperCase();
+      const pFiles = lookup[pKey] || {};
+      const ex = excelData[pKey] || null;
+
+      const fnIssues = [];
+      FTYPES.forEach(({key}) => {
+        if (pFiles[key] && !pFiles[key].name.toUpperCase().startsWith(pKey)) {
+          fnIssues.push(`${key} 파일명 불일치`);
+        }
+      });
+      if (pFiles.excel) {
+        const exCode = codeFromFile(pFiles.excel);
+        if (exCode !== pKey) fnIssues.push(`excel 파일명 코드 불일치 (${pFiles.excel.name})`);
+      }
+
+      results.push({
+        setCode, partCode, hasSetImg,
+        files: Object.fromEntries(FTYPES.map(({key}) => [key, !!pFiles[key]])),
+        excelErrors:   ex?.errors   || (pFiles.excel ? [] : []),
+        excelWarnings: ex?.warnings || [],
+        fnIssues
+      });
+    });
+  });
+
+  renderResults(results);
+  goStep(3);
+  document.getElementById('tab1').classList.add('done');
+  document.getElementById('tab2').classList.add('done');
+  window._results = results;
+  // 툴바 표시 + 필터 초기화
+  const tb = document.getElementById('result-toolbar');
+  tb.style.display = 'flex';
+  window._errFilter = false;
+  document.getElementById('filter-toggle').classList.remove('active');
+  updateFilterStatus();
+}
+
+function checkExcel(code, rows) {
+  const errors = [], warnings = [];
+
+  // 데이터 행 찾기: col0이 A####_ 패턴인 행 (XLSX.js는 빈 행 인덱스가 다를 수 있음)
+  const CODE_PAT = /^[A-Z]\d{3,5}_/i;
+  const d = rows.find(r => r && CODE_PAT.test(String(r[0]||'').trim())) || [];
+
+  // col0 = 제품코드
+  const exCode = String(d[0]||'').trim().toUpperCase();
+  if (!exCode) errors.push('제품코드 셀 없음');
+  else if (exCode !== code) errors.push('제품코드 불일치: 파일='+code+', 셀='+exCode);
+
+  // col4 = 부품전체-파이, col5 = 부품전체-높이 (필수)
+  const pai    = d[4];
+  const height = d[5];
+  if (pai    === '' || pai    == null || pai    === undefined) errors.push('부품전체-파이 값 없음');
+  if (height === '' || height == null || height === undefined) errors.push('부품전체-높이 값 없음');
+
+  // col11=내측결합부-포인트, col17=외측결합부1단-포인트, col23=외측결합부2단-포인트
+  [['내측결합부-포인트',d[11]],['외측결합부1단-포인트',d[17]],['외측결합부2단-포인트',d[23]]].forEach(([lbl,val])=>{
+    const v = String(val??'').trim();
+    if (v && v !== 'undefined' && !/^[A-Za-z가-힣][A-Za-z가-힣0-9_\-]*$/.test(v))
+      warnings.push(lbl+' 형식 이상: "'+v+'"');
+  });
+  return {errors, warnings};
+}
+
+// ─── RENDER ──────────────────────────────────────────────
+function renderResults(results) {
+  // 고유 부품코드 기준으로 통계 집계 (동일 부품이 여러 세트에 있어도 1개로 카운트)
+  const seenForStat = new Set();
+  let ok=0, warn=0, err=0;
+  results.forEach(r => {
+    if (seenForStat.has(r.partCode)) return;
+    seenForStat.add(r.partCode);
+    const hasErr = FTYPES.some(t=>!r.files[t.key]) || r.excelErrors.length || !r.hasSetImg || r.fnIssues.length;
+    if (hasErr) err++;
+    else if (r.excelWarnings.length) warn++;
+    else ok++;
+  });
+  const uniquePartCount = seenForStat.size;
+
+  const bySet = {};
+  results.forEach(r => { if(!bySet[r.setCode]) bySet[r.setCode]=[]; bySet[r.setCode].push(r); });
+
+  let html = `<div class="summary-bar">
+    <div class="stat-box"><div class="val">${uniquePartCount}</div><div class="lbl">전체 부품 (고유)</div></div>
+    <div class="stat-box ok"><div class="val">${ok}</div><div class="lbl">정상</div></div>
+    <div class="stat-box warn"><div class="val">${warn}</div><div class="lbl">경고</div></div>
+    <div class="stat-box err"><div class="val">${err}</div><div class="lbl">오류</div></div>
+    <div class="stat-box"><div class="val">${Object.keys(bySet).length}</div><div class="lbl">세트 수</div></div>
+  </div>`;
+
+  Object.entries(bySet).forEach(([setCode, parts]) => {
+    const anyErr = parts.some(r => FTYPES.some(t=>!r.files[t.key]) || r.excelErrors.length || !r.hasSetImg || r.fnIssues.length);
+    const badge = anyErr ? '<span class="badge err">✗ 오류</span>' : '<span class="badge ok">✓ 완료</span>';
+
+    const cardErrClass = anyErr ? 'result-card has-error' : 'result-card no-error';
+    html += `<div class="card ${cardErrClass}"><h3>${setCode} ${badge}</h3>`;
+
+    const pfx = (setCode.match(/^([A-Z]\d{3,5})/)||[])[1];
+    html += parts[0].hasSetImg
+      ? `<div class="notice success" style="margin-bottom:10px">✅ 세트 이미지 확인됨 (<code>${pfx}.png</code>)</div>`
+      : `<div class="notice danger"  style="margin-bottom:10px">⚠️ 세트 이미지 없음 — <code>${pfx}.png</code> 파일이 필요합니다.</div>`;
+
+    html += `<div class="result-wrap"><table><thead><tr>
+      <th>부품코드</th><th>PNG160</th><th>PNG300</th><th>PNG500</th>
+      <th>EXCEL</th><th>UNITY3D</th><th>파일명</th><th>엑셀 내용</th>
+    </tr></thead><tbody>`;
+
+    parts.forEach(r => {
+      html += `<tr><td><b>${r.partCode}</b></td>`;
+      FTYPES.forEach(({key}) => {
+        html += r.files[key]
+          ? `<td><span class="badge ok">✓</span></td>`
+          : `<td><span class="badge err">✗</span></td>`;
+      });
+      html += r.fnIssues.length
+        ? `<td><span class="badge warn" title="${r.fnIssues.join('\n')}">형식이상</span></td>`
+        : `<td><span class="badge ok">정상</span></td>`;
+
+      if (!r.excelErrors.length && !r.excelWarnings.length) {
+        html += `<td><span class="badge ok">정상</span></td>`;
+      } else {
+        html += `<td>`;
+        r.excelErrors.forEach(e  => { html += `<span class="badge err"  style="display:block;margin:1px 0">${e}</span>`; });
+        r.excelWarnings.forEach(w => { html += `<span class="badge warn" style="display:block;margin:1px 0">${w}</span>`; });
+        html += `</td>`;
+      }
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  });
+
+  document.getElementById('result-area').innerHTML = html;
+}
+
+// ─── FILTER ──────────────────────────────────────────────
+function toggleErrFilter() {
+  window._errFilter = !window._errFilter;
+  const btn = document.getElementById('filter-toggle');
+  btn.classList.toggle('active', window._errFilter);
+  btn.textContent = window._errFilter ? '📋 전체 보기' : '🔴 오류만 보기';
+  document.querySelectorAll('.result-card').forEach(el => {
+    el.classList.toggle('filter-hidden', window._errFilter && el.classList.contains('no-error'));
+  });
+  updateFilterStatus();
+}
+
+function updateFilterStatus() {
+  const total = document.querySelectorAll('.result-card').length;
+  const shown = document.querySelectorAll('.result-card:not(.filter-hidden)').length;
+  const st = document.getElementById('filter-status');
+  if (!st) return;
+  st.textContent = window._errFilter
+    ? `오류 있는 세트만 표시 중 (${shown} / ${total})`
+    : `전체 세트 표시 중 (${total})`;
+}
+
+// ─── EXPORT ──────────────────────────────────────────────
+function exportReport() {
+  const results = window._results;
+  if (!results) { alert('검증 결과가 없습니다.'); return; }
+  const rows = [['세트코드','부품코드','세트이미지','PNG160','PNG300','PNG500','EXCEL','UNITY3D','파일명','엑셀오류','엑셀경고']];
+  results.forEach(r => {
+    rows.push([
+      r.setCode, r.partCode,
+      r.hasSetImg?'O':'X(없음)',
+      r.files.png160?'O':'X', r.files.png300?'O':'X', r.files.png500?'O':'X',
+      r.files.excel?'O':'X', r.files.unity3d?'O':'X',
+      r.fnIssues.length ? r.fnIssues.join(' | ') : 'O',
+      r.excelErrors.join(' | ')||'-',
+      r.excelWarnings.join(' | ')||'-',
+    ]);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = Array(11).fill({wch:22});
+  XLSX.utils.book_append_sheet(wb, ws, '검증결과');
+  XLSX.writeFile(wb, `validation_report_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+</script>
+</body>
+</html>
