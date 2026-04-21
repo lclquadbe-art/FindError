@@ -272,6 +272,12 @@
           <label class="chasu-label" id="cl-3">
             <input type="checkbox" value="3" onchange="onChasuChange()" checked> 3차
           </label>
+          <label class="chasu-label" id="cl-4">
+            <input type="checkbox" value="4" onchange="onChasuChange()" checked> 4차
+          </label>
+          <label class="chasu-label" id="cl-5">
+            <input type="checkbox" value="5" onchange="onChasuChange()" checked> 5차
+          </label>
         </div>
       </div>
     </div>
@@ -432,7 +438,7 @@ function handleListExcel(files) {
 
 function getSelectedChasu() {
   const checked = [...document.querySelectorAll('#chasu-select input:checked')].map(el => el.value);
-  return new Set(checked.length ? checked : ['1','2','3']);
+  return new Set(checked.length ? checked : ['1','2','3','4','5']);
 }
 
 function onChasuChange() {
