@@ -194,14 +194,25 @@
     font-size:10px; font-weight:600; margin:1px;
     background:var(--surface2); color:var(--muted); border:1px solid var(--border);
   }
-  /* 오류 필터 토글 활성 상태 */
-  #filter-toggle.active {
-    background: rgba(239,68,68,.15);
-    border-color: var(--err);
-    color: var(--err);
+  .filter-btn {
+    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted);
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+    white-space: nowrap;
   }
-  /* 필터 모드: 오류 없는 세트 카드 숨김 */
-  .result-card.no-error.filter-hidden { display: none; }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active {
+    background: rgba(79,126,248,.15); border-color: var(--accent); color: var(--accent);
+  }
+  .filter-btn#fb-err.active       { background:rgba(239,68,68,.15);  border-color:var(--err);  color:var(--err);  }
+  .filter-btn#fb-setimg.active,
+  .filter-btn#fb-png160.active,
+  .filter-btn#fb-png300.active,
+  .filter-btn#fb-png500.active,
+  .filter-btn#fb-excel.active,
+  .filter-btn#fb-unity3d.active   { background:rgba(245,158,11,.15); border-color:var(--warn); color:var(--warn); }
+  /* 필터 모드: 숨길 카드 */
+  .result-card.filter-hidden { display: none; }
 
   .chasu-label {
     display: inline-flex; align-items: center; gap: 8px;
@@ -380,11 +391,17 @@
 
   <!-- ══ STEP 3 ══ -->
   <div class="panel" id="panel3">
-    <div id="result-toolbar" style="display:none; margin-bottom:14px; display:none; align-items:center; gap:10px; flex-wrap:wrap;">
-      <button class="btn btn-secondary" id="filter-toggle" onclick="toggleErrFilter()">
-        🔴 오류만 보기
-      </button>
-      <span id="filter-status" style="font-size:12px; color:var(--muted);"></span>
+    <div id="result-toolbar" style="display:none; margin-bottom:14px; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span style="font-size:12px; font-weight:700; color:var(--muted); margin-right:4px;">필터</span>
+      <button class="filter-btn" id="fb-all"     onclick="setFilter('all')">📋 전체</button>
+      <button class="filter-btn" id="fb-err"     onclick="setFilter('err')">🔴 오류만</button>
+      <button class="filter-btn" id="fb-setimg"  onclick="setFilter('setimg')">🗂 세트이미지 없음</button>
+      <button class="filter-btn" id="fb-png160"  onclick="setFilter('png160')">🖼 PNG160 없음</button>
+      <button class="filter-btn" id="fb-png300"  onclick="setFilter('png300')">🖼 PNG300 없음</button>
+      <button class="filter-btn" id="fb-png500"  onclick="setFilter('png500')">🖼 PNG500 없음</button>
+      <button class="filter-btn" id="fb-excel"   onclick="setFilter('excel')">📊 엑셀 없음</button>
+      <button class="filter-btn" id="fb-unity3d" onclick="setFilter('unity3d')">🎮 Unity3D 없음</button>
+      <span id="filter-status" style="font-size:12px; color:var(--muted); margin-left:4px;"></span>
     </div>
     <div id="result-area"><div class="empty">검증을 실행하면 결과가 표시됩니다.</div></div>
     <div class="actions">
@@ -759,8 +776,9 @@ async function runValidation() {
   // 툴바 표시 + 필터 초기화
   const tb = document.getElementById('result-toolbar');
   tb.style.display = 'flex';
-  window._errFilter = false;
-  document.getElementById('filter-toggle').classList.remove('active');
+  window._activeFilter = 'all';
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('fb-all').classList.add('active');
   updateFilterStatus();
 }
 
@@ -821,8 +839,14 @@ function renderResults(results) {
     const anyErr = parts.some(r => FTYPES.some(t=>!r.files[t.key]) || r.excelErrors.length || !r.hasSetImg || r.fnIssues.length);
     const badge = anyErr ? '<span class="badge err">✗ 오류</span>' : '<span class="badge ok">✓ 완료</span>';
 
+    // 카드에 없는 파일 종류 data 속성으로 표시
+    const missingTypes = [];
+    if (!parts[0].hasSetImg) missingTypes.push('setimg');
+    ['png160','png300','png500','excel','unity3d'].forEach(k => {
+      if (parts.some(r => !r.files[k])) missingTypes.push(k);
+    });
     const cardErrClass = anyErr ? 'result-card has-error' : 'result-card no-error';
-    html += `<div class="card ${cardErrClass}"><h3>${setCode} ${badge}</h3>`;
+    html += `<div class="card ${cardErrClass}" data-missing="${missingTypes.join(' ')}"><h3>${setCode} ${badge}</h3>`;
 
     const pfx = (setCode.match(/^([A-Z]\d{3,5})/)||[])[1];
     html += parts[0].hasSetImg
@@ -862,25 +886,43 @@ function renderResults(results) {
 }
 
 // ─── FILTER ──────────────────────────────────────────────
-function toggleErrFilter() {
-  window._errFilter = !window._errFilter;
-  const btn = document.getElementById('filter-toggle');
-  btn.classList.toggle('active', window._errFilter);
-  btn.textContent = window._errFilter ? '📋 전체 보기' : '🔴 오류만 보기';
+function setFilter(type) {
+  window._activeFilter = type;
+  // 버튼 활성화
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('fb-'+type)?.classList.add('active');
+
   document.querySelectorAll('.result-card').forEach(el => {
-    el.classList.toggle('filter-hidden', window._errFilter && el.classList.contains('no-error'));
+    let hide = false;
+    if (type === 'all') {
+      hide = false;
+    } else if (type === 'err') {
+      hide = el.classList.contains('no-error');
+    } else {
+      // setimg, png160, png300, png500, excel, unity3d
+      const missing = (el.dataset.missing || '').split(' ');
+      hide = !missing.includes(type);
+    }
+    el.classList.toggle('filter-hidden', hide);
   });
   updateFilterStatus();
 }
 
 function updateFilterStatus() {
-  const total = document.querySelectorAll('.result-card').length;
-  const shown = document.querySelectorAll('.result-card:not(.filter-hidden)').length;
+  const total  = document.querySelectorAll('.result-card').length;
+  const shown  = document.querySelectorAll('.result-card:not(.filter-hidden)').length;
   const st = document.getElementById('filter-status');
   if (!st) return;
-  st.textContent = window._errFilter
-    ? `오류 있는 세트만 표시 중 (${shown} / ${total})`
-    : `전체 세트 표시 중 (${total})`;
+  const labels = {
+    all:'전체', err:'오류 있는 세트',
+    setimg:'세트이미지 없는 세트', png160:'PNG160 없는 세트',
+    png300:'PNG300 없는 세트', png500:'PNG500 없는 세트',
+    excel:'엑셀 없는 세트', unity3d:'Unity3D 없는 세트'
+  };
+  const f = window._activeFilter || 'all';
+  st.textContent = f === 'all'
+    ? `전체 ${total}개 세트`
+    : `${labels[f]} ${shown} / ${total}개`;
 }
 
 // ─── EXPORT ──────────────────────────────────────────────
