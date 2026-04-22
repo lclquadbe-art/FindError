@@ -211,6 +211,7 @@
   .filter-btn#fb-png500.active,
   .filter-btn#fb-excel.active,
   .filter-btn#fb-unity3d.active   { background:rgba(245,158,11,.15); border-color:var(--warn); color:var(--warn); }
+  .filter-btn#fb-nasa.active      { background:rgba(124,92,252,.15); border-color:var(--accent2); color:var(--accent2); }
   /* 필터 모드: 숨길 카드 */
   .result-card.filter-hidden { display: none; }
 
@@ -401,6 +402,7 @@
       <button class="filter-btn" id="fb-png500"  onclick="setFilter('png500')">🖼 PNG500 없음</button>
       <button class="filter-btn" id="fb-excel"   onclick="setFilter('excel')">📊 엑셀 없음</button>
       <button class="filter-btn" id="fb-unity3d" onclick="setFilter('unity3d')">🎮 Unity3D 없음</button>
+      <button class="filter-btn" id="fb-nasa"    onclick="setFilter('nasa')">🔩 나사값 불일치</button>
       <span id="filter-status" style="font-size:12px; color:var(--muted); margin-left:4px;"></span>
     </div>
     <div id="result-area"><div class="empty">검증을 실행하면 결과가 표시됩니다.</div></div>
@@ -763,6 +765,7 @@ async function runValidation() {
         files: Object.fromEntries(FTYPES.map(({key}) => [key, !!pFiles[key]])),
         excelErrors:   ex?.errors   || (pFiles.excel ? [] : []),
         excelWarnings: ex?.warnings || [],
+        nasaVals: ex?.nasaVals || null,
         fnIssues
       });
     });
@@ -785,7 +788,7 @@ async function runValidation() {
 function checkExcel(code, rows) {
   const errors = [], warnings = [];
 
-  // 데이터 행 찾기: col0이 A####_ 패턴인 행 (XLSX.js는 빈 행 인덱스가 다를 수 있음)
+  // 데이터 행 찾기: col0이 A####_ 패턴인 행
   const CODE_PAT = /^[A-Z]\d{3,5}_/i;
   const d = rows.find(r => r && CODE_PAT.test(String(r[0]||'').trim())) || [];
 
@@ -800,13 +803,27 @@ function checkExcel(code, rows) {
   if (pai    === '' || pai    == null || pai    === undefined) errors.push('부품전체-파이 값 없음');
   if (height === '' || height == null || height === undefined) errors.push('부품전체-높이 값 없음');
 
-  // col11=내측결합부-포인트, col17=외측결합부1단-포인트, col23=외측결합부2단-포인트
+  // 포인트 형식 검증
   [['내측결합부-포인트',d[11]],['외측결합부1단-포인트',d[17]],['외측결합부2단-포인트',d[23]]].forEach(([lbl,val])=>{
     const v = String(val??'').trim();
     if (v && v !== 'undefined' && !/^[A-Za-z가-힣][A-Za-z가-힣0-9_\-]*$/.test(v))
       warnings.push(lbl+' 형식 이상: "'+v+'"');
   });
-  return {errors, warnings};
+
+  // 나사산수/나사줄수 값 추출 (세트 내 비교용)
+  // 내측: col9=나사산수, col10=나사줄수
+  // 외측1단: col15=나사산수, col16=나사줄수
+  // 외측2단: col21=나사산수, col22=나사줄수
+  const nasaVals = {
+    inner_san: String(d[9]  ?? '').trim(),
+    inner_jul: String(d[10] ?? '').trim(),
+    outer1_san: String(d[15] ?? '').trim(),
+    outer1_jul: String(d[16] ?? '').trim(),
+    outer2_san: String(d[21] ?? '').trim(),
+    outer2_jul: String(d[22] ?? '').trim(),
+  };
+
+  return {errors, warnings, nasaVals};
 }
 
 // ─── RENDER ──────────────────────────────────────────────
@@ -839,12 +856,28 @@ function renderResults(results) {
     const anyErr = parts.some(r => FTYPES.some(t=>!r.files[t.key]) || r.excelErrors.length || !r.hasSetImg || r.fnIssues.length);
     const badge = anyErr ? '<span class="badge err">✗ 오류</span>' : '<span class="badge ok">✓ 완료</span>';
 
+    // 세트 내 나사산수/나사줄수 비교 (missingTypes보다 먼저 계산)
+    const nasaLabels = {
+      inner_san:'내측-나사산수', inner_jul:'내측-나사줄수',
+      outer1_san:'외측1단-나사산수', outer1_jul:'외측1단-나사줄수',
+      outer2_san:'외측2단-나사산수', outer2_jul:'외측2단-나사줄수'
+    };
+    const nasaDiffs = [];
+    Object.keys(nasaLabels).forEach(key => {
+      const vals = parts
+        .filter(r => r.nasaVals && r.nasaVals[key] !== '' && r.nasaVals[key] !== 'undefined')
+        .map(r => ({ part: r.partCode, val: r.nasaVals[key] }));
+      const uniq = new Set(vals.map(v => v.val));
+      if (uniq.size > 1) nasaDiffs.push({ label: nasaLabels[key], vals });
+    });
+
     // 카드에 없는 파일 종류 data 속성으로 표시
     const missingTypes = [];
     if (!parts[0].hasSetImg) missingTypes.push('setimg');
     ['png160','png300','png500','excel','unity3d'].forEach(k => {
       if (parts.some(r => !r.files[k])) missingTypes.push(k);
     });
+    if (nasaDiffs.length) missingTypes.push('nasa');
     const cardErrClass = anyErr ? 'result-card has-error' : 'result-card no-error';
     html += `<div class="card ${cardErrClass}" data-missing="${missingTypes.join(' ')}"><h3>${setCode} ${badge}</h3>`;
 
@@ -852,6 +885,16 @@ function renderResults(results) {
     html += parts[0].hasSetImg
       ? `<div class="notice success" style="margin-bottom:10px">✅ 세트 이미지 확인됨 (<code>${pfx}.png</code>)</div>`
       : `<div class="notice danger"  style="margin-bottom:10px">⚠️ 세트 이미지 없음 — <code>${pfx}.png</code> 파일이 필요합니다.</div>`;
+
+    if (nasaDiffs.length) {
+      html += `<div class="notice danger" style="margin-bottom:10px">⚠️ <b>세트 내 나사 값 불일치</b><br>`;
+      nasaDiffs.forEach(({label, vals}) => {
+        html += `<b>${label}</b>: `;
+        html += vals.map(v => `${v.part} = <b>${v.val}</b>`).join(' / ');
+        html += `<br>`;
+      });
+      html += `</div>`;
+    }
 
     html += `<div class="result-wrap"><table><thead><tr>
       <th>부품코드</th><th>PNG160</th><th>PNG300</th><th>PNG500</th>
@@ -917,7 +960,8 @@ function updateFilterStatus() {
     all:'전체', err:'오류 있는 세트',
     setimg:'세트이미지 없는 세트', png160:'PNG160 없는 세트',
     png300:'PNG300 없는 세트', png500:'PNG500 없는 세트',
-    excel:'엑셀 없는 세트', unity3d:'Unity3D 없는 세트'
+    excel:'엑셀 없는 세트', unity3d:'Unity3D 없는 세트',
+    nasa:'나사값 불일치 세트'
   };
   const f = window._activeFilter || 'all';
   st.textContent = f === 'all'
