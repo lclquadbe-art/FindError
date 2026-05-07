@@ -894,7 +894,7 @@ function renderListQAResult(issues, container) {
 function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
   const dataStart = headerRowIdx + 1;
 
-  // 제품코드 컬럼: 헤더 텍스트 무관하게 데이터에서 A####_XXX 패턴 있는 열을 스캔
+  // 제품코드 컬럼: 데이터에서 A####_XXX 패턴 열 자동 탐색
   let colName = -1;
   for (let r = headerRowIdx + 1; r < Math.min(headerRowIdx + 30, rows.length); r++) {
     const row2 = rows[r] || [];
@@ -902,6 +902,18 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
       if (/^[A-Za-z]\d{3,6}_[A-Za-z]/.test(cv(row2, c))) { colName = c; break; }
     }
     if (colName >= 0) break;
+  }
+  // 부품코드 컬럼: colName 기준 오른쪽에서 A####_ 패턴 다시 나오는 열 탐색
+  let colPartCode = -1;
+  if (colName >= 0) {
+    for (let r = headerRowIdx + 1; r < Math.min(headerRowIdx + 30, rows.length); r++) {
+      const row2 = rows[r] || [];
+      for (let c = colName + 1; c < row2.length; c++) {
+        const v = cv(row2, c);
+        if (/^[A-Za-z]\d{3,6}_[A-Za-z]/.test(v) && c !== colName) { colPartCode = c; break; }
+      }
+      if (colPartCode >= 0) break;
+    }
   }
 
   // 제품코드 키워드 → 기대 카테고리 매핑
@@ -916,12 +928,16 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
   ];
 
   const issues = {
-    catWrong:    [],   // 1. 카테고리 값이 틀린 것
-    catTypo:     [],   // 2. 카테고리 오타
-    subcatTypo:  [],   // 2. 상세카테고리 오타
-    catMismatch: [],   // 3. 카테고리-상세카테고리 불일치
-    codeCatMismatch: [], // 4. 제품코드-카테고리 불일치
+    catWrong:          [],  // 1. 카테고리 값이 틀린 것
+    catTypo:           [],  // 2. 카테고리 오타
+    subcatTypo:        [],  // 2. 상세카테고리 오타
+    catMismatch:       [],  // 3. 카테고리-상세카테고리 불일치
+    codeCatMismatch:   [],  // 4. 제품코드-카테고리 불일치
+    layerPartMismatch: [],  // 5. 같은 레이어명인데 부품코드 목록 다름
   };
+
+  // 5번 검사를 위한 레이어명 → 부품코드 목록 수집
+  const layerPartMap = {};
 
   for (let r = dataStart; r < rows.length; r++) {
     const row    = rows[r];
@@ -976,13 +992,63 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
+  // 5: 같은 레이어명인데 부품코드 목록이 다른 경우 수집
+  let currentLayer = '';
+  let currentParts = [];
+  let currentLayerStartRow = -1;
+
+  const flushLayer = (endRow) => {
+    if (!currentLayer) return;
+    const key = currentLayer;
+    if (!layerPartMap[key]) {
+      layerPartMap[key] = { parts: currentParts.slice().sort(), firstRow: currentLayerStartRow, occurrences: [] };
+    }
+    layerPartMap[key].occurrences.push({ row: currentLayerStartRow, parts: currentParts.slice().sort() });
+  };
+
+  for (let r = dataStart; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const layerVal = colName >= 0 ? cv(row, colName) : '';
+    const partVal  = colPartCode >= 0 ? cv(row, colPartCode) : '';
+
+    // 새 레이어명 등장 → 이전 그룹 저장
+    if (layerVal && layerVal !== currentLayer) {
+      flushLayer(r);
+      currentLayer = layerVal;
+      currentParts = [];
+      currentLayerStartRow = r + 1;
+    }
+    if (partVal) currentParts.push(partVal);
+  }
+  flushLayer(rows.length); // 마지막 그룹
+
+  // 같은 레이어명에서 부품코드 목록이 다른 것 찾기
+  Object.entries(layerPartMap).forEach(([layer, data]) => {
+    const occs = data.occurrences;
+    if (occs.length < 2) return;
+    const ref = occs[0].parts.join(',');
+    occs.forEach((occ, i) => {
+      if (i === 0) return;
+      if (occ.parts.join(',') !== ref) {
+        issues.layerPartMismatch.push({
+          layer,
+          firstRow: occs[0].row,
+          firstParts: occs[0].parts,
+          diffRow: occ.row,
+          diffParts: occ.parts,
+        });
+      }
+    });
+  });
+
   renderCategoryQAResult(issues, container);
 }
 
 function renderCategoryQAResult(issues, container) {
   const total = issues.catWrong.length + issues.catTypo.length +
                 issues.subcatTypo.length + issues.catMismatch.length +
-                issues.codeCatMismatch.length;
+                issues.codeCatMismatch.length + issues.layerPartMismatch.length;
 
   if (total === 0) {
     container.innerHTML = `
@@ -1076,6 +1142,29 @@ function renderCategoryQAResult(issues, container) {
           </div>
         </div>`
       ).join('')
+    );
+  }
+
+  // 5. 같은 레이어명인데 부품코드 목록 다름
+  if (issues.layerPartMismatch.length > 0) {
+    html += qaGroup('5. 같은 레이어명 내 부품코드 목록 불일치', issues.layerPartMismatch.length, 'err',
+      issues.layerPartMismatch.map(({layer, firstRow, firstParts, diffRow, diffParts}) => {
+        const missing = firstParts.filter(p => !diffParts.includes(p));
+        const added   = diffParts.filter(p => !firstParts.includes(p));
+        let detail = '';
+        if (missing.length) detail += `<div style="margin:2px 0">누락: ${missing.map(p=>`<span class="chip" style="color:var(--err)">${p}</span>`).join('')}</div>`;
+        if (added.length)   detail += `<div style="margin:2px 0">추가: ${added.map(p=>`<span class="chip" style="color:var(--warn)">${p}</span>`).join('')}</div>`;
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start">
+          <div style="margin-bottom:4px">
+            <span class="badge err">불일치</span>
+            레이어명 <b>"${layer}"</b>
+            <span style="color:var(--muted);font-size:11px"> 첫등장 행${firstRow} vs 행${diffRow}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted)">첫등장: ${firstParts.map(p=>`<span class="chip">${p}</span>`).join('')}</div>
+          <div style="font-size:11px;color:var(--muted)">재등장: ${diffParts.map(p=>`<span class="chip">${p}</span>`).join('')}</div>
+          ${detail}
+        </div>`;
+      }).join('')
     );
   }
 
