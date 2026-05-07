@@ -894,19 +894,33 @@ function renderListQAResult(issues, container) {
 function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
   const dataStart = headerRowIdx + 1;
 
-  // 제품코드(부품명) 컬럼: 헤더 행에서 '3D 데이터 레이어명' 또는 첫 번째 텍스트 컬럼 찾기
+  // 제품코드 컬럼: 헤더 텍스트 무관하게 데이터에서 A####_XXX 패턴 있는 열을 스캔
   let colName = -1;
-  const headerRow = rows[headerRowIdx] || [];
-  for (let c = 0; c < headerRow.length; c++) {
-    const v = cv(headerRow, c);
-    if (v === '3D 데이터 레이어명' || v === '영문 부품명' || v === '부품명') { colName = c; break; }
+  for (let r = headerRowIdx + 1; r < Math.min(headerRowIdx + 30, rows.length); r++) {
+    const row2 = rows[r] || [];
+    for (let c = 0; c < row2.length; c++) {
+      if (/^[A-Za-z]\d{3,6}_[A-Za-z]/.test(cv(row2, c))) { colName = c; break; }
+    }
+    if (colName >= 0) break;
   }
 
+  // 제품코드 키워드 → 기대 카테고리 매핑
+  const CODE_CAT_MAP = [
+    { pattern: /_PUMP/i,                       cats: new Set(['PUMP']) },
+    { pattern: /_BOTTLE/i,                     cats: new Set(['BOTTLE']) },
+    { pattern: /_CAP/i,                        cats: new Set(['CAP(B)','CAP(J)']) },
+    { pattern: /_JAR/i,                        cats: new Set(['JAR']) },
+    { pattern: /_TUBE/i,                       cats: new Set(['TUBE']) },
+    { pattern: /_DROP|_SPUIT/i,                cats: new Set(['DROP/SPUIT']) },
+    { pattern: /_COMPACT|_REFILL/i,            cats: new Set(['PACT/POWDER']) },
+  ];
+
   const issues = {
-    catWrong:   [],   // 1. 카테고리 값이 틀린 것
-    catTypo:    [],   // 2. 카테고리 오타
-    subcatTypo: [],   // 2. 상세카테고리 오타
-    catMismatch:[],   // 3. 카테고리-상세카테고리 불일치
+    catWrong:    [],   // 1. 카테고리 값이 틀린 것
+    catTypo:     [],   // 2. 카테고리 오타
+    subcatTypo:  [],   // 2. 상세카테고리 오타
+    catMismatch: [],   // 3. 카테고리-상세카테고리 불일치
+    codeCatMismatch: [], // 4. 제품코드-카테고리 불일치
   };
 
   for (let r = dataStart; r < rows.length; r++) {
@@ -916,7 +930,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     const subcat = cv(row, colSubcat);
     const name   = colName >= 0 ? cv(row, colName) : '';
 
-    if (!cat && !subcat) continue;
+    if (!cat && !subcat && !name) continue;
 
     // SEED 제외
     if (cat && cat.toUpperCase() === 'SEED') continue;
@@ -949,6 +963,17 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
         }
       }
     }
+
+    // 4: 제품코드 키워드 vs 카테고리 불일치
+    if (name && cat && VALID_CATEGORIES.has(cat)) {
+      for (const { pattern, cats } of CODE_CAT_MAP) {
+        if (pattern.test(name) && !cats.has(cat)) {
+          const expected = [...cats].join(' 또는 ');
+          issues.codeCatMismatch.push({ row: r+1, name, cat, expected });
+          break;
+        }
+      }
+    }
   }
 
   renderCategoryQAResult(issues, container);
@@ -956,7 +981,8 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
 
 function renderCategoryQAResult(issues, container) {
   const total = issues.catWrong.length + issues.catTypo.length +
-                issues.subcatTypo.length + issues.catMismatch.length;
+                issues.subcatTypo.length + issues.catMismatch.length +
+                issues.codeCatMismatch.length;
 
   if (total === 0) {
     container.innerHTML = `
@@ -1031,6 +1057,22 @@ function renderCategoryQAResult(issues, container) {
             카테고리 <b>"${cat}"</b> 에 상세카테고리 <b>"${subcat}"</b> 은 포함되지 않음
             <span style="color:var(--muted);font-size:11px"> (부품: ${name||'-'})</span><br>
             <span style="color:var(--muted);font-size:11px">허용: ${[...(VALID_CAT_PAIRS[cat]||[])].join(', ')}</span>
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  // 4. 제품코드-카테고리 불일치
+  if (issues.codeCatMismatch.length > 0) {
+    html += qaGroup('4. 제품코드 ↔ 카테고리 불일치', issues.codeCatMismatch.length, 'err',
+      issues.codeCatMismatch.map(({row, name, cat, expected}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge err">불일치</span>
+            제품코드 <b>"${name}"</b> 의 카테고리는 <b>"${cat}"</b> 이지만
+            코드 키워드 기준 기대값은 <b style="color:var(--ok)">"${expected}"</b>
           </div>
         </div>`
       ).join('')
