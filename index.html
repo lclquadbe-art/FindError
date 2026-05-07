@@ -85,7 +85,6 @@
   .drop-zone small { display: block; margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.8; }
   .drop-zone input { display: none; }
 
-  /* AUTO-CLASSIFY BINS */
   .bins { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; margin-top: 18px; }
   @media(max-width:1000px){ .bins { grid-template-columns: repeat(4,1fr); } }
   @media(max-width:600px) { .bins { grid-template-columns: repeat(2,1fr); } }
@@ -112,7 +111,6 @@
   .bin-file button:hover { color: var(--err); }
   .bin-empty { font-size: 10px; color: var(--border); text-align:center; padding: 8px 0; }
 
-  /* progress */
   #classify-prog {
     display:none; align-items:center; gap:10px;
     margin-top:12px; font-size:12px; color:var(--muted);
@@ -124,7 +122,6 @@
   }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  /* file list (step1) */
   .file-list { margin-top: 12px; display:flex; flex-direction:column; gap:6px; }
   .file-item {
     display:flex; align-items:center; gap:10px;
@@ -138,7 +135,6 @@
   .file-item .fname { flex:1; font-size:12px; word-break:break-all; }
   .file-item .fsize { color:var(--muted); font-size:11px; white-space:nowrap; }
 
-  /* table */
   .result-wrap { overflow-x:auto; }
   table { width:100%; border-collapse:collapse; font-size:12px; }
   th {
@@ -155,6 +151,7 @@
   .badge.ok   { background:rgba(34,197,94,.15);  color:var(--ok);   }
   .badge.warn { background:rgba(245,158,11,.15); color:var(--warn); }
   .badge.err  { background:rgba(239,68,68,.15);  color:var(--err);  }
+  .badge.info { background:rgba(79,126,248,.15); color:var(--accent); }
 
   .summary-bar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
   .stat-box {
@@ -187,6 +184,7 @@
   .notice.info    { background:rgba(79,126,248,.1);  border:1px solid rgba(79,126,248,.3); }
   .notice.success { background:rgba(34,197,94,.1);   border:1px solid rgba(34,197,94,.3);  color:var(--ok);  }
   .notice.danger  { background:rgba(239,68,68,.1);   border:1px solid rgba(239,68,68,.3);  color:var(--err); }
+  .notice.warning { background:rgba(245,158,11,.1);  border:1px solid rgba(245,158,11,.3); color:var(--warn); }
 
   .empty { text-align:center; color:var(--muted); padding:32px; font-size:13px; }
   .chip {
@@ -212,7 +210,7 @@
   .filter-btn#fb-excel.active,
   .filter-btn#fb-unity3d.active   { background:rgba(245,158,11,.15); border-color:var(--warn); color:var(--warn); }
   .filter-btn#fb-nasa.active      { background:rgba(124,92,252,.15); border-color:var(--accent2); color:var(--accent2); }
-  /* 필터 모드: 숨길 카드 */
+
   .result-card.filter-hidden { display: none; }
 
   .chasu-label {
@@ -231,6 +229,37 @@
     background:var(--surface2); padding:1px 5px; border-radius:4px;
     font-size:11px; font-family:monospace;
   }
+
+  /* 엑셀 품질 검사 결과 섹션 */
+  .excel-qa-section {
+    margin-top: 24px;
+  }
+  .excel-qa-section h2 {
+    font-size: 16px; font-weight: 700; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .qa-group {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
+  }
+  .qa-group-header {
+    padding: 12px 16px; background: var(--surface2);
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none;
+  }
+  .qa-group-header:hover { background: var(--border); }
+  .qa-group-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .qa-group-count { font-size: 12px; color: var(--muted); }
+  .qa-group-body { padding: 12px 16px; }
+  .qa-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid #1e2235; font-size: 12px;
+  }
+  .qa-item:last-child { border-bottom: none; }
+  .qa-item .row-info { color: var(--muted); white-space: nowrap; min-width: 50px; }
+  .qa-item .qa-detail { flex: 1; }
+  .collapsed .qa-group-body { display: none; }
 </style>
 </head>
 <body>
@@ -239,7 +268,7 @@
   <div class="logo">📦</div>
   <div>
     <h1>세트·부품 파일 검증 시스템</h1>
-    <p>세트-부품 리스트 엑셀 기반 파일 완성도 자동 검사</p>
+    <p>세트-부품 리스트 엑셀 기반 파일 완성도 자동 검사 + 엑셀 품질 검사</p>
   </div>
 </header>
 
@@ -251,7 +280,7 @@
     <button class="step-btn"        id="tab3" onclick="goStep(3)"><span class="num">3</span> 검증 결과</button>
   </div>
 
-  <!-- ══ STEP 1 ══ -->
+  <!-- STEP 1 -->
   <div class="panel active" id="panel1">
     <div class="card">
       <h3>① 세트-부품 리스트 엑셀 <span class="tag">필수</span></h3>
@@ -275,24 +304,18 @@
       <div id="chasu-select" style="display:none; margin-top:16px;">
         <div style="font-size:12px; font-weight:700; color:var(--muted); margin-bottom:10px;">차수 선택 <span style="font-weight:400; color:var(--muted)">(포함할 차수를 선택하세요)</span></div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <label class="chasu-label" id="cl-1">
-            <input type="checkbox" value="1" onchange="onChasuChange()" checked> 1차
-          </label>
-          <label class="chasu-label" id="cl-2">
-            <input type="checkbox" value="2" onchange="onChasuChange()" checked> 2차
-          </label>
-          <label class="chasu-label" id="cl-3">
-            <input type="checkbox" value="3" onchange="onChasuChange()" checked> 3차
-          </label>
-          <label class="chasu-label" id="cl-4">
-            <input type="checkbox" value="4" onchange="onChasuChange()" checked> 4차
-          </label>
-          <label class="chasu-label" id="cl-5">
-            <input type="checkbox" value="5" onchange="onChasuChange()" checked> 5차
-          </label>
+          <label class="chasu-label"><input type="checkbox" value="1" onchange="onChasuChange()" checked> 1차</label>
+          <label class="chasu-label"><input type="checkbox" value="2" onchange="onChasuChange()" checked> 2차</label>
+          <label class="chasu-label"><input type="checkbox" value="3" onchange="onChasuChange()" checked> 3차</label>
+          <label class="chasu-label"><input type="checkbox" value="4" onchange="onChasuChange()" checked> 4차</label>
+          <label class="chasu-label"><input type="checkbox" value="5" onchange="onChasuChange()" checked> 5차</label>
         </div>
       </div>
     </div>
+
+    <!-- 엑셀 품질 검사 결과 (Step 1에서 바로 표시) -->
+    <div id="excel-qa-container"></div>
+
     <div id="parsed-preview" style="display:none">
       <div class="card">
         <h3>파싱된 세트·부품 목록</h3>
@@ -304,7 +327,7 @@
     </div>
   </div>
 
-  <!-- ══ STEP 2 ══ -->
+  <!-- STEP 2 -->
   <div class="panel" id="panel2">
     <div class="card">
       <h3>② 파일 일괄 업로드 <span class="tag">자동 분류</span></h3>
@@ -319,7 +342,6 @@
         </div>
       </div>
 
-      <!-- SINGLE DROP ZONE -->
       <div style="display:flex; gap:10px; margin-bottom:10px;">
         <button class="btn btn-secondary" style="flex:1; justify-content:center;"
                 onclick="document.getElementById('inp-folder').click()">
@@ -351,7 +373,6 @@
         <span id="classify-msg">분류 중...</span>
       </div>
 
-      <!-- BINS -->
       <div class="bins">
         <div class="bin">
           <div class="bin-header"><span class="bin-label">🗂 세트이미지</span><span class="bin-count" id="cnt-setimg">0</span></div>
@@ -390,7 +411,7 @@
     </div>
   </div>
 
-  <!-- ══ STEP 3 ══ -->
+  <!-- STEP 3 -->
   <div class="panel" id="panel3">
     <div id="result-toolbar" style="display:none; margin-bottom:14px; align-items:center; gap:8px; flex-wrap:wrap;">
       <span style="font-size:12px; font-weight:700; color:var(--muted); margin-right:4px;">필터</span>
@@ -415,10 +436,114 @@
 </div>
 
 <script>
+// ─── 유효 카테고리 정의 ─────────────────────────────────
+const VALID_CATEGORIES = new Set([
+  'JAR','BOTTLE','CAP(B)','CAP(J)','DROP/SPUIT','PACT/POWDER','POINT MAKEUP','ACCESSORY','TUBE','PUMP'
+]);
+
+const ALL_VALID_SUBCATS = new Set([
+  '초자용기',
+  '블로우용기',
+  '사출용기',
+  '딥튜브펌프',
+  '에어리스펌프',
+  '미스트펌프',
+  '포머펌프',
+  '향수펌프',
+  '스크류캡(FLAT)',
+  '스크류캡(POINT)',
+  '쿠션',
+  '팩트',
+  '섀도우',
+  '팔레트',
+  '파우더',
+  '쿠션(리필)',
+  '팁/브러시',
+  '립스틱',
+  '기타',
+  '괄사',
+  '스크류캡',
+  '원터치캡',
+  '오버캡(펌프)',
+  '일반스포이드',
+  '오토스포이드',
+  '스파출러',
+  '브러시',
+  '퍼프'
+]);
+
+// ─── 레벤슈타인 거리 (오타 감지) ────────────────────────
+function levenshtein(a, b) {
+  const al = a.toLowerCase(), bl = b.toLowerCase();
+  const dp = Array.from({length: al.length+1}, (_,i) => i);
+  for (let j = 1; j <= bl.length; j++) {
+    let prev = j;
+    for (let i = 1; i <= al.length; i++) {
+      const val = Math.min(
+        dp[i-1] + (al[i-1] === bl[j-1] ? 0 : 1),
+        dp[i] + 1,
+        prev + 1
+      );
+      dp[i-1] = prev;
+      prev = val;
+    }
+    dp[al.length] = prev;
+  }
+  return dp[al.length];
+}
+
+// 가장 가까운 유효값 찾기 (거리 1~2 → 오타 의심)
+function findTypoSuggestion(val, validSet, maxDist = 2) {
+  const norm = val.trim();
+  // 완전 일치(대소문자 무시) 체크
+  for (const v of validSet) {
+    if (v.toLowerCase() === norm.toLowerCase() && v !== norm) {
+      return { suggestion: v, dist: 0, type: 'case' }; // 대소문자 오타
+    }
+  }
+  // 공백 제거 후 체크
+  const noSpace = norm.replace(/\s+/g, '');
+  for (const v of validSet) {
+    if (v.replace(/\s+/g, '').toLowerCase() === noSpace.toLowerCase() && v !== norm) {
+      return { suggestion: v, dist: 1, type: 'space' }; // 공백 오타
+    }
+  }
+  // 레벤슈타인 거리
+  let best = null, bestDist = Infinity;
+  for (const v of validSet) {
+    const d = levenshtein(norm, v);
+    if (d < bestDist) { bestDist = d; best = v; }
+  }
+  if (bestDist <= maxDist) {
+    return { suggestion: best, dist: bestDist, type: 'typo' };
+  }
+  return null;
+}
+
+const VALID_CAT_PAIRS = {
+  'JAR':          new Set(['초자용기','블로우용기','사출용기','기타']),
+  'BOTTLE':       new Set(['초자용기','블로우용기','사출용기','기타']),
+
+  'CAP(B)':       new Set(['스크류캡','원터치캡','기타','오버캡(펌프)']),
+  'CAP(J)':       new Set(['스크류캡','원터치캡','기타']),
+
+  'DROP/SPUIT':   new Set(['오토스포이드','일반스포이드']),
+
+  'PACT/POWDER':  new Set(['팩트','파우더','팔레트','섀도우','쿠션','쿠션(리필)','기타']),
+
+  'POINT MAKEUP': new Set(['팁/브러시','립스틱','기타']),
+
+  'TUBE':         new Set(['스크류캡(FLAT)','스크류캡(POINT)']),
+
+  'PUMP':         new Set(['딥튜브펌프','에어리스펌프','미스트펌프','포머펌프','향수펌프']),
+
+   'ACCESSORY':         new Set(['기타','괄사','스파출러','브러시','퍼프']),
+};
+
 // ─── STATE ───────────────────────────────────────────────
 const S = {
   sets: [],
-  rawRows: null,   // 엑셀 원본 rows 저장 (차수 변경 시 재파싱용)
+  rawRows: null,
   files: { setimg:[], png160:[], png300:[], png500:[], excel:[], unity3d:[], unknown:[] }
 };
 
@@ -450,6 +575,8 @@ function handleListExcel(files) {
     const wb = XLSX.read(e.target.result, {type:'array'});
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
     S.rawRows = rows;
+    // 엑셀 품질 검사 실행
+    runExcelQA(rows);
     parseListRows(rows);
   };
   r.readAsArrayBuffer(f);
@@ -461,25 +588,16 @@ function getSelectedChasu() {
 }
 
 function onChasuChange() {
-  if (S.rawRows) parseListRows(S.rawRows);
+  if (S.rawRows) {
+    parseListRows(S.rawRows);
+  }
 }
 
-function parseListRows(rows) {
-  // 헤더 2행(row0, row1) 스킵 → 데이터는 row2부터
-  // col2 = 차수, col3 = 도면번호(세트코드), col14 = 부품코드
-  // 차수가 1,2,3 인 행만 처리
-  // 도면번호는 값이 있을 때만 갱신 (병합셀처럼 빈 경우 이전 값 유지)
-
-  const COL_CHASU   = 2;
-  const COL_SETCODE = 3;
-  const COL_PARTCODE = 8;  // col8: 제품 코드 = 부품코드
-  const VALID_CHASU = getSelectedChasu();
-
-  const sets = {};       // setCode → [partCode, ...]
-  const setOrder = [];   // 순서 유지
-  let currentSet = null;
-
-  // XLSX.js 빈 셀 = undefined → 'undefined' 문자열 방지
+// ═══════════════════════════════════════════════════════
+// 엑셀 품질 검사
+// 헤더를 동적으로 스캔해서 카테고리/상세카테고리 열 위치를 찾음
+// ═══════════════════════════════════════════════════════
+function runExcelQA(rows) {
   const cv = (row, col) => {
     const v = row[col];
     if (v === null || v === undefined) return '';
@@ -487,16 +605,482 @@ function parseListRows(rows) {
     return (s === 'nan' || s === 'undefined' || s === 'null') ? '' : s;
   };
 
-  for (let r = 2; r < rows.length; r++) {   // 헤더 2행 스킵
+  const container = document.getElementById('excel-qa-container');
+
+  // 헤더 행 동적 스캔 — 첫 5행 내에서 '카테고리', '상세카테고리' 열 찾기
+  let colCat = -1, colSubcat = -1, headerRowIdx = -1;
+  for (let r = 0; r < Math.min(5, rows.length); r++) {
+    const row = rows[r];
+    if (!row) continue;
+    let fc = -1, fs = -1;
+    for (let c = 0; c < row.length; c++) {
+      const v = cv(row, c);
+      if (v === '카테고리')    fc = c;
+      if (v === '상세카테고리') fs = c;
+    }
+    if (fc >= 0 && fs >= 0) {
+      colCat = fc; colSubcat = fs; headerRowIdx = r;
+      break;
+    }
+  }
+
+  if (colCat >= 0 && colSubcat >= 0) {
+    runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx);
+  } else {
+    runListQA(rows, cv, container);
+  }
+}
+
+// ── 세트-부품 리스트 품질 검사 ────────────────────────────
+function runListQA(rows, cv, container) {
+  const COL_CHASU    = 2;
+  const COL_SETCODE  = 3;
+  const COL_PARTCODE = 8;
+
+  // 검사 ①②③④⑤
+  const issues = {
+    catTypo:  [],      // ① 카테고리 오타 (대소문자·공백·유사값)
+    catWrong: [],      // ① 카테고리 완전 오류
+    subcatTypo: [],    // ② 상세카테고리 오타
+    partDup:  [],      // ③ 같은 세트코드 내 부품코드 중복
+    setDup:   [],      // ④ 도면번호(세트코드) 중복
+    partDiff: [],      // ⑤ 같은 도면번호인데 부품코드가 다른것
+  };
+
+  // 리스트 엑셀에서 카테고리 컬럼 탐색 (헤더에 '카테고리' 있으면 검사)
+  let colCat = -1, colSubcat = -1;
+  if (rows[1]) {
+    rows[1].forEach((v, i) => {
+      const s = String(v||'').trim();
+      if (s === '카테고리') colCat = i;
+      if (s === '상세카테고리') colSubcat = i;
+    });
+  }
+
+  // 데이터 수집
+  const setMap = {}; // setCode → [{row, partCode, chasu}]
+  const allSetCodes = []; // 순서 보존
+
+  for (let r = 2; r < rows.length; r++) {
+    const row = rows[r];
+    const chasu   = cv(row, COL_CHASU);
+    const setCode = cv(row, COL_SETCODE);
+    const partCode = cv(row, COL_PARTCODE);
+
+    if (!setCode && !partCode) continue;
+
+    const sc = setCode ? setCode.toUpperCase() : null;
+    const pc = partCode ? partCode.toUpperCase() : null;
+
+    // ① 카테고리 오타 검사 (컬럼이 있는 경우)
+    if (colCat >= 0) {
+      const cat = cv(row, colCat);
+      const subcat = colSubcat >= 0 ? cv(row, colSubcat) : '';
+      if (cat && !VALID_CATEGORIES.has(cat)) {
+        const typo = findTypoSuggestion(cat, VALID_CATEGORIES);
+        if (typo) {
+          issues.catTypo.push({ row: r+1, cat, suggestion: typo.suggestion, typoType: typo.type });
+        } else {
+          issues.catWrong.push({ row: r+1, cat });
+        }
+      }
+      if (subcat && !ALL_VALID_SUBCATS.has(subcat)) {
+        const typo = findTypoSuggestion(subcat, ALL_VALID_SUBCATS);
+        if (typo) issues.subcatTypo.push({ row: r+1, subcat, suggestion: typo.suggestion, typoType: typo.type });
+      }
+    }
+
+    if (sc) {
+      if (!setMap[sc]) {
+        setMap[sc] = [];
+        allSetCodes.push(sc);
+      }
+    }
+
+    const currentSet = sc || (allSetCodes.length > 0 ? allSetCodes[allSetCodes.length-1] : null);
+    if (currentSet && pc) {
+      if (!setMap[currentSet]) { setMap[currentSet] = []; }
+      setMap[currentSet].push({ row: r+1, partCode: pc, chasu });
+    }
+  }
+
+  // ③ 같은 세트코드 내 부품코드 중복
+  Object.entries(setMap).forEach(([setCode, entries]) => {
+    const seen = {};
+    entries.forEach(({row, partCode}) => {
+      seen[partCode] = seen[partCode] || [];
+      seen[partCode].push(row);
+    });
+    Object.entries(seen).forEach(([pc, rows_]) => {
+      if (rows_.length > 1) {
+        issues.partDup.push({ setCode, partCode: pc, rows: rows_ });
+      }
+    });
+  });
+
+  // ④ 도면번호(세트코드) 중복 체크 - 동일 세트코드가 여러 차수에 등장
+  const setCodeChasuMap = {}; // setCode → [{chasu, row}]
+  for (let r = 2; r < rows.length; r++) {
+    const row = rows[r];
+    const setCode = cv(row, COL_SETCODE);
+    const chasu   = cv(row, COL_CHASU);
+    if (!setCode) continue;
+    const sc = setCode.toUpperCase();
+    if (!setCodeChasuMap[sc]) setCodeChasuMap[sc] = [];
+    setCodeChasuMap[sc].push({ chasu, row: r+1 });
+  }
+  Object.entries(setCodeChasuMap).forEach(([setCode, entries]) => {
+    if (entries.length > 1) {
+      const chasusUniq = [...new Set(entries.map(e => e.chasu))];
+      if (chasusUniq.length > 1) {
+        issues.setDup.push({ setCode, entries });
+      }
+    }
+  });
+
+  // ⑤ 같은 도면번호인데 부품코드 목록이 다른것 (다른 차수끼리 비교)
+  // → 같은 세트코드가 여러 차수에 나오면 각 차수의 부품코드 세트를 비교
+  const setCodePerChasu = {}; // `${setCode}__${chasu}` → Set of partCodes
+  let currentSet2 = null;
+  for (let r = 2; r < rows.length; r++) {
+    const row = rows[r];
+    const chasu   = cv(row, COL_CHASU);
+    const setCode = cv(row, COL_SETCODE);
+    const partCode = cv(row, COL_PARTCODE);
+    if (setCode) currentSet2 = setCode.toUpperCase();
+    if (!currentSet2 || !partCode || !chasu) continue;
+    const key = `${currentSet2}__${chasu}`;
+    if (!setCodePerChasu[key]) setCodePerChasu[key] = new Set();
+    setCodePerChasu[key].add(partCode.toUpperCase());
+  }
+
+  // 같은 세트코드에서 차수별 부품코드 세트 비교
+  const setCodesInMultiChasu = {};
+  Object.keys(setCodePerChasu).forEach(key => {
+    const [sc] = key.split('__');
+    if (!setCodesInMultiChasu[sc]) setCodesInMultiChasu[sc] = [];
+    setCodesInMultiChasu[sc].push(key);
+  });
+  Object.entries(setCodesInMultiChasu).forEach(([sc, keys]) => {
+    if (keys.length < 2) return;
+    const setsArr = keys.map(k => ({ key: k, chasu: k.split('__')[1], parts: setCodePerChasu[k] }));
+    // 모두 동일한지 확인
+    const ref = [...setsArr[0].parts].sort().join(',');
+    const diffs = setsArr.filter(s => [...s.parts].sort().join(',') !== ref);
+    if (diffs.length > 0) {
+      issues.partDiff.push({ setCode: sc, setsArr });
+    }
+  });
+
+  renderListQAResult(issues, container);
+}
+
+function renderListQAResult(issues, container) {
+  const total = issues.catTypo.length + issues.catWrong.length +
+                issues.subcatTypo.length + issues.partDup.length +
+                issues.setDup.length + issues.partDiff.length;
+
+  if (total === 0) {
+    container.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 중복·불일치·오타 항목이 발견되지 않았습니다.</div>
+      </div>`;
+    return;
+  }
+
+  const typoTypeLabel = t => t === 'case' ? '대소문자 오류' : t === 'space' ? '공백 포함' : '오타';
+
+  let html = `<div class="excel-qa-section">
+    <h2>📋 엑셀 품질 검사 결과 <span class="badge err" style="font-size:13px">${total}건 발견</span></h2>`;
+
+  // ① 카테고리 오타
+  if (issues.catTypo.length > 0) {
+    html += qaGroup('① 카테고리 오타 의심', issues.catTypo.length, 'err',
+      issues.catTypo.map(({row, cat, suggestion, typoType}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge err">${typoTypeLabel(typoType)}</span>
+            <b>"${cat}"</b> → 수정 제안: <b style="color:var(--ok)">"${suggestion}"</b>
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  if (issues.catWrong.length > 0) {
+    html += qaGroup('① 카테고리 알 수 없음', issues.catWrong.length, 'err',
+      issues.catWrong.map(({row, cat}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge err">오류</span> <b>"${cat}"</b> 은 유효한 카테고리가 아님
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  if (issues.subcatTypo.length > 0) {
+    html += qaGroup('② 상세카테고리 오타 의심', issues.subcatTypo.length, 'warn',
+      issues.subcatTypo.map(({row, subcat, suggestion, typoType}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge warn">${typoTypeLabel(typoType)}</span>
+            <b>"${subcat}"</b> → 수정 제안: <b style="color:var(--ok)">"${suggestion}"</b>
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  // ③ 부품코드 중복
+  if (issues.partDup.length > 0) {
+    html += qaGroup('③ 세트 내 부품코드 중복', issues.partDup.length, 'err',
+      issues.partDup.map(({setCode, partCode, rows}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${rows.join(', ')}</span>
+          <div class="qa-detail">
+            <span class="badge err">중복</span>
+            세트 <b>${setCode}</b> 내에서 부품코드 <b>${partCode}</b> 이(가) ${rows.length}회 반복
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  // ④ 도면번호 중복
+  if (issues.setDup.length > 0) {
+    html += qaGroup('④ 도면번호(세트코드) 중복 등장', issues.setDup.length, 'warn',
+      issues.setDup.map(({setCode, entries}) => {
+        const chasuInfo = entries.map(e => `${e.chasu}차(행${e.row})`).join(', ');
+        return `<div class="qa-item">
+          <div class="qa-detail">
+            <span class="badge warn">중복</span>
+            도면번호 <b>${setCode}</b> 이(가) 여러 차수에 등장: ${chasuInfo}
+          </div>
+        </div>`;
+      }).join('')
+    );
+  }
+
+  // ⑤ 같은 도면번호 내 부품코드 불일치
+  if (issues.partDiff.length > 0) {
+    html += qaGroup('⑤ 같은 도면번호인데 차수별 부품코드 다름', issues.partDiff.length, 'warn',
+      issues.partDiff.map(({setCode, setsArr}) => {
+        const lines = setsArr.map(s =>
+          `<div style="margin:2px 0"><b>${s.chasu}차</b>: ${[...s.parts].map(p=>`<span class="chip">${p}</span>`).join('')}</div>`
+        ).join('');
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start">
+          <div style="margin-bottom:4px"><span class="badge warn">불일치</span> 도면번호 <b>${setCode}</b></div>
+          <div>${lines}</div>
+        </div>`;
+      }).join('')
+    );
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  // 토글 이벤트
+  container.querySelectorAll('.qa-group-header').forEach(h => {
+    h.addEventListener('click', () => h.closest('.qa-group').classList.toggle('collapsed'));
+  });
+}
+
+// ── 카테고리/상세카테고리 품질 검사 (동적 컬럼) ──────────────
+// colCat, colSubcat: runExcelQA 에서 헤더 스캔으로 찾은 열 번호
+// dataStartRow: 헤더 다음 행부터 데이터
+function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
+  const dataStart = headerRowIdx + 1;
+
+  // 제품코드(부품명) 컬럼: 헤더 행에서 '3D 데이터 레이어명' 또는 첫 번째 텍스트 컬럼 찾기
+  let colName = -1;
+  const headerRow = rows[headerRowIdx] || [];
+  for (let c = 0; c < headerRow.length; c++) {
+    const v = cv(headerRow, c);
+    if (v === '3D 데이터 레이어명' || v === '영문 부품명' || v === '부품명') { colName = c; break; }
+  }
+
+  const issues = {
+    catWrong:   [],   // 1. 카테고리 값이 틀린 것
+    catTypo:    [],   // 2. 카테고리 오타
+    subcatTypo: [],   // 2. 상세카테고리 오타
+    catMismatch:[],   // 3. 카테고리-상세카테고리 불일치
+  };
+
+  for (let r = dataStart; r < rows.length; r++) {
+    const row    = rows[r];
+    if (!row) continue;
+    const cat    = cv(row, colCat);
+    const subcat = cv(row, colSubcat);
+    const name   = colName >= 0 ? cv(row, colName) : '';
+
+    if (!cat && !subcat) continue;
+
+    // SEED 제외
+    if (cat && cat.toUpperCase() === 'SEED') continue;
+
+    // 1 & 2: 카테고리 검사
+    if (cat && !VALID_CATEGORIES.has(cat)) {
+      const typo = findTypoSuggestion(cat, VALID_CATEGORIES);
+      if (typo) {
+        issues.catTypo.push({ row: r+1, cat, subcat, name, suggestion: typo.suggestion, typoType: typo.type });
+      } else {
+        issues.catWrong.push({ row: r+1, cat, subcat, name });
+      }
+    }
+
+    // 2: 상세카테고리 오타
+    if (subcat && !ALL_VALID_SUBCATS.has(subcat)) {
+      const typo = findTypoSuggestion(subcat, ALL_VALID_SUBCATS);
+      if (typo) {
+        issues.subcatTypo.push({ row: r+1, cat, subcat, name, suggestion: typo.suggestion, typoType: typo.type });
+      }
+    }
+
+    // 3: 카테고리-상세카테고리 불일치
+    if (cat && subcat && VALID_CATEGORIES.has(cat)) {
+      const validSubs = VALID_CAT_PAIRS[cat];
+      if (validSubs && !validSubs.has(subcat)) {
+        const alreadyTypo = issues.subcatTypo.some(i => i.row === r+1);
+        if (!alreadyTypo) {
+          issues.catMismatch.push({ row: r+1, cat, subcat, name });
+        }
+      }
+    }
+  }
+
+  renderCategoryQAResult(issues, container);
+}
+
+function renderCategoryQAResult(issues, container) {
+  const total = issues.catWrong.length + issues.catTypo.length +
+                issues.subcatTypo.length + issues.catMismatch.length;
+
+  if (total === 0) {
+    container.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 오류·오타·불일치 항목이 없습니다.</div>
+      </div>`;
+    return;
+  }
+
+  const typoTypeLabel = t => t === 'case' ? '대소문자 오류' : t === 'space' ? '공백 포함' : '오타';
+
+  let html = `<div class="excel-qa-section">
+    <h2>📋 엑셀 품질 검사 결과 <span class="badge err" style="font-size:13px">${total}건 발견</span></h2>`;
+
+  // 1. 값이 틀린 것
+  if (issues.catWrong.length > 0) {
+    html += qaGroup('1. 카테고리 값이 틀린 것', issues.catWrong.length, 'err',
+      issues.catWrong.map(({row, cat, subcat, name}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge err">값 오류</span>
+            카테고리 <b>"${cat}"</b> 은 유효하지 않음
+            <span style="color:var(--muted);font-size:11px"> (상세: ${subcat||'-'}, 부품: ${name||'-'})</span><br>
+            <span style="color:var(--muted);font-size:11px">유효값: ${[...VALID_CATEGORIES].join(', ')}</span>
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  // 2. 카테고리 오타
+  if (issues.catTypo.length > 0) {
+    html += qaGroup('2. 카테고리 오타', issues.catTypo.length, 'warn',
+      issues.catTypo.map(({row, cat, subcat, name, suggestion, typoType}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge warn">${typoTypeLabel(typoType)}</span>
+            <b>"${cat}"</b> → 수정 제안: <b style="color:var(--ok)">"${suggestion}"</b>
+            <span style="color:var(--muted);font-size:11px"> (상세: ${subcat||'-'}, 부품: ${name||'-'})</span>
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  // 2. 상세카테고리 오타
+  if (issues.subcatTypo.length > 0) {
+    html += qaGroup('2. 상세카테고리 오타', issues.subcatTypo.length, 'warn',
+      issues.subcatTypo.map(({row, cat, subcat, name, suggestion, typoType}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge warn">${typoTypeLabel(typoType)}</span>
+            상세카테고리 <b>"${subcat}"</b> → 수정 제안: <b style="color:var(--ok)">"${suggestion}"</b>
+            <span style="color:var(--muted);font-size:11px"> (카테고리: ${cat||'-'}, 부품: ${name||'-'})</span>
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  // 3. 불일치
+  if (issues.catMismatch.length > 0) {
+    html += qaGroup('3. 카테고리 ↔ 상세카테고리 불일치', issues.catMismatch.length, 'err',
+      issues.catMismatch.map(({row, cat, subcat, name}) =>
+        `<div class="qa-item">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            <span class="badge err">불일치</span>
+            카테고리 <b>"${cat}"</b> 에 상세카테고리 <b>"${subcat}"</b> 은 포함되지 않음
+            <span style="color:var(--muted);font-size:11px"> (부품: ${name||'-'})</span><br>
+            <span style="color:var(--muted);font-size:11px">허용: ${[...(VALID_CAT_PAIRS[cat]||[])].join(', ')}</span>
+          </div>
+        </div>`
+      ).join('')
+    );
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  container.querySelectorAll('.qa-group-header').forEach(h => {
+    h.addEventListener('click', () => h.closest('.qa-group').classList.toggle('collapsed'));
+  });
+}
+
+function qaGroup(title, count, type, bodyHtml) {
+  const icon = type === 'err' ? '🔴' : type === 'warn' ? '🟡' : '🔵';
+  return `<div class="qa-group">
+    <div class="qa-group-header">
+      <div class="qa-group-title">${icon} ${title}</div>
+      <span class="qa-group-count badge ${type}">${count}건</span>
+    </div>
+    <div class="qa-group-body">${bodyHtml}</div>
+  </div>`;
+}
+
+// ─── PARSE LIST ROWS ─────────────────────────────────────
+function parseListRows(rows) {
+  const COL_CHASU    = 2;
+  const COL_SETCODE  = 3;
+  const COL_PARTCODE = 8;
+  const VALID_CHASU  = getSelectedChasu();
+
+  const sets = {};
+  const setOrder = [];
+  let currentSet = null;
+
+  const cv = (row, col) => {
+    const v = row[col];
+    if (v === null || v === undefined) return '';
+    const s = String(v).trim();
+    return (s === 'nan' || s === 'undefined' || s === 'null') ? '' : s;
+  };
+
+  for (let r = 2; r < rows.length; r++) {
     const row      = rows[r];
     const chasu    = cv(row, COL_CHASU);
     const setCode  = cv(row, COL_SETCODE);
     const partCode = cv(row, COL_PARTCODE);
 
-    // 차수 필터: 1,2,3 만
     if (!VALID_CHASU.has(chasu)) continue;
 
-    // 도면번호: 값 있으면 갱신, 없으면 이전 값 유지 (forward-fill)
     if (setCode) {
       currentSet = setCode.toUpperCase();
       if (!sets[currentSet]) {
@@ -505,7 +1089,6 @@ function parseListRows(rows) {
       }
     }
 
-    // 부품코드 추가 (col8 제품 코드)
     if (partCode && currentSet) {
       const pc = partCode.toUpperCase();
       if (!sets[currentSet].includes(pc)) sets[currentSet].push(pc);
@@ -514,11 +1097,9 @@ function parseListRows(rows) {
 
   S.sets = setOrder.map(setCode => ({ setCode, parts: sets[setCode] }));
 
-  // Render preview
   const total = S.sets.reduce((s,x) => s+x.parts.length, 0);
   const uniqueTotal = new Set(S.sets.flatMap(s => s.parts)).size;
 
-  // 세트 내 중복 찾기
   const dupeSets = [];
   S.sets.forEach(({setCode, parts}) => {
     const seen = {}, dupes = [];
@@ -556,9 +1137,7 @@ function parseListRows(rows) {
 }
 
 // ─── STEP 2: FILE UPLOAD + AUTO-CLASSIFY ─────────────────
-
-// Regex patterns
-const RE_SET_IMG  = /^[A-Z]\d{3,5}\.(png|jpg|jpeg)$/i;   // A1234.png  (no underscore)
+const RE_SET_IMG  = /^[A-Z]\d{3,5}\.(png|jpg|jpeg)$/i;
 const RE_PART_PNG = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.(png|jpg|jpeg)$/i;
 const RE_EXCEL    = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.(xlsx|xls)$/i;
 const RE_UNITY    = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.unity3d$/i;
@@ -573,7 +1152,6 @@ function getImgSize(file) {
   });
 }
 
-// 폴더 드래그 시 DataTransferItem에서 재귀적으로 파일 수집
 async function getFilesFromEntry(entry) {
   return new Promise(resolve => {
     if (entry.isFile) {
@@ -632,7 +1210,6 @@ async function handleAllFiles(fileList) {
   refreshBins();
 }
 
-// 드롭 이벤트 - 폴더 드래그 지원
 async function handleDrop(e) {
   e.preventDefault();
   dzLeave('dz-all');
@@ -644,7 +1221,6 @@ async function handleDrop(e) {
   let files = [];
   const items = [...(e.dataTransfer.items || [])];
   if (items.length && items[0].webkitGetAsEntry) {
-    // 폴더 포함 드래그 처리
     const entries = items.map(i => i.webkitGetAsEntry()).filter(Boolean);
     const nested  = await Promise.all(entries.map(getFilesFromEntry));
     files = nested.flat();
@@ -686,7 +1262,6 @@ const FTYPES = [
 ];
 
 function codeFromFile(f) {
-  // _measure 제거 후 코드 추출 (있어도 없어도 동일하게 처리)
   const name = f.name.replace(/_measure\./i, '.').replace(/_measure$/i, '');
   const m = name.match(/^([A-Z]\d{3,5}_[A-Za-z0-9_]+?)(?:\.|_measure)/i)
          || name.match(/^([A-Z]\d{3,5}_[A-Za-z0-9_]+)/i);
@@ -699,7 +1274,6 @@ function fmtSize(b) {
 async function runValidation() {
   if (!S.sets.length) { alert('세트-부품 리스트 엑셀을 먼저 업로드하세요.'); return; }
 
-  // File lookup: CODE → {key:File}
   const lookup = {};
   FTYPES.forEach(({key}) => {
     S.files[key].forEach(f => {
@@ -710,14 +1284,12 @@ async function runValidation() {
     });
   });
 
-  // Set image lookup: A#### → File
   const setImgMap = {};
   S.files.setimg.forEach(f => {
     const m = f.name.match(/^([A-Z]\d{3,5})\./i);
     if (m) setImgMap[m[1].toUpperCase()] = f;
   });
 
-  // Read & validate excel files
   const excelData = {};
   await Promise.all(S.files.excel.map(f => new Promise(res => {
     const code = codeFromFile(f);
@@ -736,9 +1308,6 @@ async function runValidation() {
     r.readAsArrayBuffer(f);
   })));
 
-  // Build result rows
-  // 세트는 452개 그대로 유지, 부품은 세트별로 모두 표시
-  // 단 요약 통계(전체 부품 수)는 고유 부품코드 기준으로 표시
   const results = [];
   S.sets.forEach(({setCode, parts}) => {
     const pfx = (setCode.match(/^([A-Z]\d{3,5})/i)||[])[1]?.toUpperCase();
@@ -776,7 +1345,6 @@ async function runValidation() {
   document.getElementById('tab1').classList.add('done');
   document.getElementById('tab2').classList.add('done');
   window._results = results;
-  // 툴바 표시 + 필터 초기화
   const tb = document.getElementById('result-toolbar');
   tb.style.display = 'flex';
   window._activeFilter = 'all';
@@ -788,32 +1356,24 @@ async function runValidation() {
 function checkExcel(code, rows) {
   const errors = [], warnings = [];
 
-  // 데이터 행 찾기: col0이 A####_ 패턴인 행
   const CODE_PAT = /^[A-Z]\d{3,5}_/i;
   const d = rows.find(r => r && CODE_PAT.test(String(r[0]||'').trim())) || [];
 
-  // col0 = 제품코드
   const exCode = String(d[0]||'').trim().toUpperCase();
   if (!exCode) errors.push('제품코드 셀 없음');
   else if (exCode !== code) errors.push('제품코드 불일치: 파일='+code+', 셀='+exCode);
 
-  // col4 = 부품전체-파이, col5 = 부품전체-높이 (필수)
   const pai    = d[4];
   const height = d[5];
-  if (pai    === '' || pai    == null || pai    === undefined) errors.push('부품전체-파이 값 없음');
-  if (height === '' || height == null || height === undefined) errors.push('부품전체-높이 값 없음');
+  if (pai    === '' || pai    == null) errors.push('부품전체-파이 값 없음');
+  if (height === '' || height == null) errors.push('부품전체-높이 값 없음');
 
-  // 포인트 형식 검증
   [['내측결합부-포인트',d[11]],['외측결합부1단-포인트',d[17]],['외측결합부2단-포인트',d[23]]].forEach(([lbl,val])=>{
     const v = String(val??'').trim();
     if (v && v !== 'undefined' && !/^[A-Za-z가-힣][A-Za-z가-힣0-9_\-]*$/.test(v))
       warnings.push(lbl+' 형식 이상: "'+v+'"');
   });
 
-  // 나사산수/나사줄수 값 추출 (세트 내 비교용)
-  // 내측: col9=나사산수, col10=나사줄수
-  // 외측1단: col15=나사산수, col16=나사줄수
-  // 외측2단: col21=나사산수, col22=나사줄수
   const nasaVals = {
     inner_san: String(d[9]  ?? '').trim(),
     inner_jul: String(d[10] ?? '').trim(),
@@ -828,7 +1388,6 @@ function checkExcel(code, rows) {
 
 // ─── RENDER ──────────────────────────────────────────────
 function renderResults(results) {
-  // 고유 부품코드 기준으로 통계 집계 (동일 부품이 여러 세트에 있어도 1개로 카운트)
   const seenForStat = new Set();
   let ok=0, warn=0, err=0;
   results.forEach(r => {
@@ -856,7 +1415,6 @@ function renderResults(results) {
     const anyErr = parts.some(r => FTYPES.some(t=>!r.files[t.key]) || r.excelErrors.length || !r.hasSetImg || r.fnIssues.length);
     const badge = anyErr ? '<span class="badge err">✗ 오류</span>' : '<span class="badge ok">✓ 완료</span>';
 
-    // 세트 내 나사산수/나사줄수 비교 (missingTypes보다 먼저 계산)
     const nasaLabels = {
       inner_san:'내측-나사산수', inner_jul:'내측-나사줄수',
       outer1_san:'외측1단-나사산수', outer1_jul:'외측1단-나사줄수',
@@ -871,7 +1429,6 @@ function renderResults(results) {
       if (uniq.size > 1) nasaDiffs.push({ label: nasaLabels[key], vals });
     });
 
-    // 카드에 없는 파일 종류 data 속성으로 표시
     const missingTypes = [];
     if (!parts[0].hasSetImg) missingTypes.push('setimg');
     ['png160','png300','png500','excel','unity3d'].forEach(k => {
@@ -931,7 +1488,6 @@ function renderResults(results) {
 // ─── FILTER ──────────────────────────────────────────────
 function setFilter(type) {
   window._activeFilter = type;
-  // 버튼 활성화
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('fb-'+type)?.classList.add('active');
 
@@ -942,7 +1498,6 @@ function setFilter(type) {
     } else if (type === 'err') {
       hide = el.classList.contains('no-error');
     } else {
-      // setimg, png160, png300, png500, excel, unity3d
       const missing = (el.dataset.missing || '').split(' ');
       hide = !missing.includes(type);
     }
