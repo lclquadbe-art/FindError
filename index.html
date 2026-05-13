@@ -897,7 +897,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
 
   // 5: 같은 레이어명인데 부품코드 목록이 다른 경우 수집
   const layerPartMap = {};
-  let currentLayer = '', currentParts = [], currentLayerStartRow = -1, currentLayerChasu = '';
+  let currentLayer = '', currentParts = new Set(), currentLayerStartRow = -1, currentLayerChasu = '';
 
   const flushLayer = () => {
     if (!currentLayer) return;
@@ -905,7 +905,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     layerPartMap[currentLayer].occurrences.push({
       row: currentLayerStartRow,
       chasu: currentLayerChasu,
-      parts: currentParts.slice().sort()
+      parts: [...currentParts].sort()
     });
   };
 
@@ -918,11 +918,11 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     if (layerVal && layerVal !== currentLayer) {
       flushLayer();
       currentLayer         = layerVal;
-      currentParts         = [];
+      currentParts         = new Set();
       currentLayerStartRow = r + 1;
       currentLayerChasu    = chasu;
     }
-    if (partVal) currentParts.push(partVal);
+    if (partVal) currentParts.add(partVal);
   }
   flushLayer();
 
