@@ -404,28 +404,34 @@
 
 <script>
 // ─── 유효 카테고리 정의 ─────────────────────────────────
+// 출처: 카테고리_정리.xlsx
 const VALID_CATEGORIES = new Set([
-  'JAR','BOTTLE','CAP(B)','CAP(J)','DROP/SPUIT','PACT/POWDER','POINT MAKEUP','ACCESSORY','TUBE','PUMP'
+  'JAR','BOTTLE','CAP(B)','CAP(J)','DROP/SPUIT','PACT/POWDER','POINT MAKEUP','ACCESSORY','TUBE','PUMP','STICK'
 ]);
 
 const ALL_VALID_SUBCATS = new Set([
-  '초자용기','블로우용기','사출용기','딥튜브펌프','에어리스펌프','미스트펌프','포머펌프','향수펌프',
-  '스크류캡(FLAT)','스크류캡(POINT)','쿠션','팩트','섀도우','팔레트','파우더','쿠션(리필)',
-  '팁/브러시','립스틱','기타','괄사','스크류캡','원터치캡','오버캡(펌프)',
-  '일반스포이드','오토스포이드','스파출러','브러시','퍼프'
+  '초자용기','블로우용기','사출용기','기타',
+  '스크류캡','스크류캡(FLAT)','스크류캡(POINT)','원터치캡','오버캡(펌프)','펌프',
+  '쿠션','쿠션(리필)','팩트','섀도우','팔레트','파우더',
+  '팁/브러시','립스틱','펜타입',
+  '일반스포이드','오토스포이드',
+  '딥튜브펌프','에어리스펌프','미스트펌프','포머펌프','향수펌프',
+  '괄사','스파출러','브러시','퍼프',
+  '스틱'
 ]);
 
 const VALID_CAT_PAIRS = {
   'JAR':          new Set(['초자용기','블로우용기','사출용기','기타']),
   'BOTTLE':       new Set(['초자용기','블로우용기','사출용기','기타']),
-  'CAP(B)':       new Set(['스크류캡','원터치캡','기타','오버캡(펌프)']),
-  'CAP(J)':       new Set(['스크류캡','원터치캡','기타']),
-  'DROP/SPUIT':   new Set(['오토스포이드','일반스포이드']),
-  'PACT/POWDER':  new Set(['팩트','파우더','팔레트','섀도우','쿠션','쿠션(리필)','기타']),
-  'POINT MAKEUP': new Set(['팁/브러시','립스틱','기타']),
-  'TUBE':         new Set(['스크류캡(FLAT)','스크류캡(POINT)']),
-  'PUMP':         new Set(['딥튜브펌프','에어리스펌프','미스트펌프','포머펌프','향수펌프']),
-  'ACCESSORY':    new Set(['기타','괄사','스파출러','브러시','퍼프']),
+  'CAP(J)':       new Set(['스크류캡','원터치캡','오버캡(펌프)']),
+  'CAP(B)':       new Set(['스크류캡','원터치캡','오버캡(펌프)']),
+  'TUBE':         new Set(['스크류캡(FLAT)','스크류캡(POINT)','원터치캡','펌프','기타']),
+  'POINT MAKEUP': new Set(['립스틱','팁/브러시','펜타입','기타']),
+  'PACT/POWDER':  new Set(['쿠션','쿠션(리필)','팩트','섀도우','팔레트','파우더','기타']),
+  'STICK':        new Set(['스틱','립스틱']),
+  'PUMP':         new Set(['딥튜브펌프','에어리스펌프','미스트펌프','포머펌프','향수펌프','기타']),
+  'DROP/SPUIT':   new Set(['일반스포이드','오토스포이드']),
+  'ACCESSORY':    new Set(['스파출러','괄사','브러시','퍼프','기타']),
 };
 
 // ─── STATE ───────────────────────────────────────────────
@@ -897,7 +903,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
 
   // 5: 같은 레이어명인데 부품코드 목록이 다른 경우 수집
   const layerPartMap = {};
-  let currentLayer = '', currentParts = new Set(), currentLayerStartRow = -1, currentLayerChasu = '';
+  let currentLayer = '', currentParts = [], currentLayerStartRow = -1, currentLayerChasu = '';
 
   const flushLayer = () => {
     if (!currentLayer) return;
@@ -905,7 +911,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     layerPartMap[currentLayer].occurrences.push({
       row: currentLayerStartRow,
       chasu: currentLayerChasu,
-      parts: [...currentParts].sort()
+      parts: currentParts.slice().sort()
     });
   };
 
@@ -918,11 +924,11 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     if (layerVal && layerVal !== currentLayer) {
       flushLayer();
       currentLayer         = layerVal;
-      currentParts         = new Set();
+      currentParts         = [];
       currentLayerStartRow = r + 1;
       currentLayerChasu    = chasu;
     }
-    if (partVal) currentParts.add(partVal);
+    if (partVal) currentParts.push(partVal);
   }
   flushLayer();
 
