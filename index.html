@@ -153,7 +153,6 @@
   .badge.err  { background:rgba(239,68,68,.15);  color:var(--err);  }
   .badge.info { background:rgba(79,126,248,.15); color:var(--accent); }
 
-  /* 차수 배지 */
   .chasu-tag {
     display:inline-block; padding:1px 6px; border-radius:10px; font-size:10px; font-weight:700;
     background:rgba(79,126,248,.18); color:var(--accent); border:1px solid rgba(79,126,248,.35);
@@ -404,7 +403,6 @@
 
 <script>
 // ─── 유효 카테고리 정의 ─────────────────────────────────
-// 출처: 카테고리_정리.xlsx
 const VALID_CATEGORIES = new Set([
   'JAR','BOTTLE','CAP(B)','CAP(J)','DROP/SPUIT','PACT/POWDER','POINT MAKEUP','ACCESSORY','TUBE','PUMP','STICK'
 ]);
@@ -519,7 +517,10 @@ function getSelectedChasu() {
 }
 
 function onChasuChange() {
-  if (S.rawRows) parseListRows(S.rawRows);
+  if (S.rawRows) {
+    runExcelQA(S.rawRows);
+    parseListRows(S.rawRows);
+  }
 }
 
 // ─── 엑셀 품질 검사 ──────────────────────────────────────
@@ -554,9 +555,11 @@ function runExcelQA(rows) {
 
 // ─── 세트-부품 리스트 품질 검사 ──────────────────────────
 function runListQA(rows, cv, container) {
-  const COL_CHASU    = 2;  // C열
+  const COL_CHASU    = 2;
   const COL_SETCODE  = 3;
   const COL_PARTCODE = 8;
+
+  const VALID_CHASU = getSelectedChasu();
 
   const issues = {
     catTypo:    [],
@@ -588,6 +591,11 @@ function runListQA(rows, cv, container) {
 
     if (!setCode && !partCode) continue;
 
+    // C열 차수가 없으면 무시
+    if (!chasu) continue;
+    // 선택된 차수가 아니면 건너뜀
+    if (!VALID_CHASU.has(chasu)) continue;
+
     // 카테고리 오타 검사
     if (colCat >= 0) {
       const cat    = cv(row, colCat);
@@ -618,7 +626,7 @@ function runListQA(rows, cv, container) {
     }
   }
 
-  // ③ 세트 내 부품코드 중복 — 차수별로 그룹화해서 표시
+  // ③ 세트 내 부품코드 중복
   Object.entries(setMap).forEach(([setCode, entries]) => {
     const seen = {};
     entries.forEach(({row, partCode, chasu}) => {
@@ -633,12 +641,13 @@ function runListQA(rows, cv, container) {
   });
 
   // ④ 도면번호 중복 — 여러 차수에 같은 세트코드 등장
+  // (차수 필터 없이 전체 스캔해야 여러 차수에 걸쳐 있는지 알 수 있음)
   const setCodeChasuMap = {};
   for (let r = 2; r < rows.length; r++) {
     const row     = rows[r];
-    const setCode = cv(row, COL_SETCODE);
     const chasu   = cv(row, COL_CHASU);
-    if (!setCode) continue;
+    const setCode = cv(row, COL_SETCODE);
+    if (!chasu || !setCode) continue;
     const sc = setCode.toUpperCase();
     if (!setCodeChasuMap[sc]) setCodeChasuMap[sc] = [];
     setCodeChasuMap[sc].push({ chasu, row: r+1 });
@@ -650,7 +659,7 @@ function runListQA(rows, cv, container) {
     }
   });
 
-  // ⑤ 같은 도면번호인데 차수별 부품코드 다름
+  // ⑤ 같은 도면번호인데 차수별 부품코드 다름 (선택된 차수만 비교)
   const setCodePerChasu = {};
   let currentSet2 = null;
   for (let r = 2; r < rows.length; r++) {
@@ -658,8 +667,11 @@ function runListQA(rows, cv, container) {
     const chasu    = cv(row, COL_CHASU);
     const setCode  = cv(row, COL_SETCODE);
     const partCode = cv(row, COL_PARTCODE);
+
     if (setCode) currentSet2 = setCode.toUpperCase();
     if (!currentSet2 || !partCode || !chasu) continue;
+    if (!VALID_CHASU.has(chasu)) continue;
+
     const key = `${currentSet2}__${chasu}`;
     if (!setCodePerChasu[key]) setCodePerChasu[key] = new Set();
     setCodePerChasu[key].add(partCode.toUpperCase());
@@ -696,7 +708,6 @@ function renderListQAResult(issues, container) {
   let html = `<div class="excel-qa-section">
     <h2>📋 엑셀 품질 검사 결과 <span class="badge err" style="font-size:13px">${total}건 발견</span></h2>`;
 
-  // ① 카테고리 오타
   if (issues.catTypo.length > 0) {
     html += qaGroup('① 카테고리 오타 의심', issues.catTypo.length, 'err',
       issues.catTypo.map(({row, chasu, cat, suggestion, typoType}) => {
@@ -746,7 +757,6 @@ function renderListQAResult(issues, container) {
     );
   }
 
-  // ③ 부품코드 중복
   if (issues.partDup.length > 0) {
     html += qaGroup('③ 세트 내 부품코드 중복', issues.partDup.length, 'err',
       issues.partDup.map(({setCode, partCode, items}) => {
@@ -766,7 +776,6 @@ function renderListQAResult(issues, container) {
     );
   }
 
-  // ④ 도면번호 중복
   if (issues.setDup.length > 0) {
     html += qaGroup('④ 도면번호(세트코드) 중복 등장', issues.setDup.length, 'warn',
       issues.setDup.map(({setCode, entries}) => {
@@ -784,7 +793,6 @@ function renderListQAResult(issues, container) {
     );
   }
 
-  // ⑤ 같은 도면번호 차수별 부품코드 불일치
   if (issues.partDiff.length > 0) {
     html += qaGroup('⑤ 같은 도면번호인데 차수별 부품코드 다름', issues.partDiff.length, 'warn',
       issues.partDiff.map(({setCode, setsArr}) => {
@@ -804,14 +812,14 @@ function renderListQAResult(issues, container) {
 
   html += '</div>';
   container.innerHTML = html;
-
 }
 
 // ─── 카테고리/상세카테고리 품질 검사 (동적 컬럼) ──────────
 function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
-  const dataStart = headerRowIdx + 1;
+  const dataStart   = headerRowIdx + 1;
+  const VALID_CHASU = getSelectedChasu();
 
-  // C열(차수) 컬럼 탐색 — 헤더에서 '차수' 찾기, 없으면 col2 기본값
+  // 차수 컬럼 탐색
   let colChasu = 2;
   for (let c = 0; c < (rows[headerRowIdx]||[]).length; c++) {
     if (cv(rows[headerRowIdx], c) === '차수') { colChasu = c; break; }
@@ -846,7 +854,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     layerPartMismatch: [],
   };
 
-  // 부품코드 컬럼 탐색 (colName 기준 오른쪽에서 A####_ 패턴 다시 나오는 열)
+  // 부품코드 컬럼 탐색
   let colPartCode = -1;
   if (colName >= 0) {
     for (let r = dataStart; r < Math.min(dataStart+30, rows.length); r++) {
@@ -859,15 +867,19 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
+  // ── 카테고리/오타/불일치 검사 (선택된 차수만) ──
   for (let r = dataStart; r < rows.length; r++) {
-    const row    = rows[r]; if (!row) continue;
-    const cat    = cv(row, colCat);
-    const subcat = cv(row, colSubcat);
-    const name   = colName >= 0 ? cv(row, colName) : '';
-    const chasu  = cv(row, colChasu);
+    const row      = rows[r]; if (!row) continue;
+    const chasu    = cv(row, colChasu);
+    const cat      = cv(row, colCat);
+    const subcat   = cv(row, colSubcat);
+    const name     = colName >= 0 ? cv(row, colName) : '';
 
     if (!cat && !subcat && !name) continue;
     if (cat && cat.toUpperCase() === 'SEED') continue;
+
+    // C열 차수 없으면 무시, 선택된 차수만 검사
+    if (!chasu || !VALID_CHASU.has(chasu)) continue;
 
     if (cat && !VALID_CATEGORIES.has(cat)) {
       const typo = findTypoSuggestion(cat, VALID_CATEGORIES);
@@ -901,7 +913,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
-  // 5: 같은 레이어명인데 부품코드 목록이 다른 경우 수집
+  // ── 레이어 내 부품코드 불일치 (선택된 차수만) ──
   const layerPartMap = {};
   let currentLayer = '', currentParts = [], currentLayerStartRow = -1, currentLayerChasu = '';
 
@@ -909,7 +921,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     if (!currentLayer) return;
     if (!layerPartMap[currentLayer]) layerPartMap[currentLayer] = { occurrences: [] };
     layerPartMap[currentLayer].occurrences.push({
-      row: currentLayerStartRow,
+      row:   currentLayerStartRow,
       chasu: currentLayerChasu,
       parts: currentParts.slice().sort()
     });
@@ -917,10 +929,11 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
 
   for (let r = dataStart; r < rows.length; r++) {
     const row      = rows[r]; if (!row) continue;
+    const chasu    = cv(row, colChasu);
     const layerVal = colName >= 0 ? cv(row, colName) : '';
     const partVal  = colPartCode >= 0 ? cv(row, colPartCode) : '';
-    const chasu    = cv(row, colChasu);
 
+    // 레이어명이 바뀌면 현재까지 수집한 내용을 flush
     if (layerVal && layerVal !== currentLayer) {
       flushLayer();
       currentLayer         = layerVal;
@@ -928,7 +941,11 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
       currentLayerStartRow = r + 1;
       currentLayerChasu    = chasu;
     }
-    if (partVal) currentParts.push(partVal);
+
+    // C열 차수 없거나 선택 안 된 차수면 부품코드 수집 안 함
+    if (partVal && chasu && VALID_CHASU.has(chasu)) {
+      currentParts.push(partVal);
+    }
   }
   flushLayer();
 
@@ -938,6 +955,8 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     const ref = occs[0].parts.join(',');
     occs.forEach((occ, i) => {
       if (i === 0) return;
+      // 둘 중 하나라도 차수 없으면 쌍 제외
+      if (!occs[0].chasu || !occ.chasu) return;
       if (occ.parts.join(',') !== ref) {
         issues.layerPartMismatch.push({
           layer,
@@ -1095,7 +1114,6 @@ function renderCategoryQAResult(issues, container) {
 
   html += '</div>';
   container.innerHTML = html;
-
 }
 
 function qaGroup(title, count, type, bodyHtml) {
@@ -1117,21 +1135,6 @@ function toggleQaGroup(e, uid) {
   document.getElementById(uid).classList.toggle('collapsed');
 }
 
-// qa-item 생성 헬퍼 — copyText를 data-copy에 심어둠
-// copyText 미지정시 자동으로 row+chasu+label+msg 조합
-function qaItem({ row, chasu, label, msg, copyText, extraHtml = '', flexCol = false }) {
-  const chasuHtml  = chasu ? chasuBadges(new Set(Array.isArray(chasu) ? chasu : [chasu])) : '';
-  const chasuStr   = chasu ? (Array.isArray(chasu) ? chasu.map(c=>c+'차') : [chasu+'차']).join(',') : '';
-  const rowStr     = row   ? `행 ${row}` : '';
-  const auto       = [rowStr, chasuStr ? `[${chasuStr}]` : '', label ? `[${label}]` : '', msg].filter(Boolean).join(' ');
-  const copy       = copyText ?? auto;
-  const style      = flexCol ? ' style="flex-direction:column;align-items:flex-start"' : '';
-  return `<div class="qa-item"${style} data-copy="${copy.replace(/"/g,'&quot;')}">
-    ${row ? `<span class="row-info">행 ${row}</span>` : ''}
-    <div class="qa-detail">${chasuHtml}${extraHtml}</div>
-  </div>`;
-}
-
 function copyQAGroup(uid, title, btn) {
   const group = document.getElementById(uid);
   const items = group.querySelectorAll('.qa-item');
@@ -1141,7 +1144,6 @@ function copyQAGroup(uid, title, btn) {
     if (copyText) {
       lines.push('  ' + copyText);
     } else {
-      // fallback: 보이는 텍스트 그대로
       const t = item.innerText.replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
       if (t) lines.push('  ' + t);
     }
@@ -1194,6 +1196,8 @@ function parseListRows(rows) {
     const setCode  = cv(row, COL_SETCODE);
     const partCode = cv(row, COL_PARTCODE);
 
+    // C열 차수 없으면 무시
+    if (!chasu) continue;
     if (!VALID_CHASU.has(chasu)) continue;
 
     if (setCode) {
