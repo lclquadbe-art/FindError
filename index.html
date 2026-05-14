@@ -858,11 +858,17 @@ function renderListQAResult(issues, container) {
         const htmlLines = setsArr.map(s =>
           `<div style="margin:2px 0">${chasuBadges(new Set([s.chasu]))} ${[...s.parts].map(p=>`<span class="chip">${p}</span>`).join('')}</div>`
         ).join('');
-        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
-          <div style="margin-bottom:4px"><span class="badge warn">불일치</span> 도면번호 <b>${setCode}</b></div>
-          <div>${htmlLines}</div>
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
+            background:rgba(245,158,11,.04); border:1px solid rgba(245,158,11,.2);
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:10px;">
+            <span class="badge warn">불일치</span> 도면번호 <b>${setCode}</b>
+          </div>
+          <div style="padding:8px 10px; background:var(--surface2); border-radius:6px;">
+            ${htmlLines}
+          </div>
         </div>`;
-      }).join('')
+      }).join('<div style="height:4px"></div>')
     );
   }
 
@@ -912,26 +918,28 @@ function renderListQAResult(issues, container) {
         ];
         const copy = copyLines.join('\n');
         const dupSet = new Set(dups.map(d => d.part));
-        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
-          <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
+            background:rgba(239,68,68,.04); border:1px solid rgba(239,68,68,.18);
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
             <span class="badge err">중복</span>
             레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
             <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
           </div>
-          <div style="margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">중복 항목:</span>
+          <div style="margin-bottom:8px; padding:8px 10px; background:rgba(239,68,68,.08); border-radius:6px;">
+            <span style="font-size:11px; color:var(--err); font-weight:700; margin-right:6px;">중복 항목</span>
             ${dups.map(d => `<span class="chip-dup">${d.part}<span class="dup-cnt">${d.count}</span></span>`).join('')}
           </div>
-          <div>
-            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
+          <div style="padding:8px 10px; background:var(--surface2); border-radius:6px;">
+            <span style="font-size:11px; color:var(--muted); font-weight:700; margin-right:6px;">전체 목록</span>
             ${allParts.map(p => dupSet.has(p)
               ? `<span class="chip-dup">${p}</span>`
               : `<span class="chip">${p}</span>`
             ).join('')}
           </div>
         </div>`;
-      }).join('')
+      }).join('<div style="height:4px"></div>')
     );
   }
 
@@ -1271,22 +1279,26 @@ function renderCategoryQAResult(issues, container) {
         let detailHtml = '';
         if (missing.length) detailHtml += `<div style="margin:2px 0">누락: ${missing.map(p=>`<span class="chip" style="color:var(--err)">${p}</span>`).join('')}</div>`;
         if (added.length)   detailHtml += `<div style="margin:2px 0">추가: ${added.map(p=>`<span class="chip" style="color:var(--warn)">${p}</span>`).join('')}</div>`;
-        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
-          <div style="margin-bottom:6px">
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
+            background:rgba(239,68,68,.04); border:1px solid rgba(239,68,68,.18);
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             <span class="badge err">불일치</span>
             레이어명 <b>"${layer}"</b>
           </div>
-          <div style="font-size:11px; color:var(--muted); margin-bottom:2px">
-            ${firstChasu ? chasuBadges(new Set([firstChasu])) : ''} 행${firstRow}:
-            ${firstParts.map(p=>`<span class="chip">${p}</span>`).join('')}
+          <div style="padding:8px 10px; background:var(--surface2); border-radius:6px; margin-bottom:${detailHtml?'8px':'0'};">
+            <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">
+              ${firstChasu ? chasuBadges(new Set([firstChasu])) : ''} 행${firstRow}:
+              ${firstParts.map(p=>`<span class="chip">${p}</span>`).join('')}
+            </div>
+            <div style="font-size:11px; color:var(--muted);">
+              ${diffChasu ? chasuBadges(new Set([diffChasu])) : ''} 행${diffRow}:
+              ${diffParts.map(p=>`<span class="chip">${p}</span>`).join('')}
+            </div>
           </div>
-          <div style="font-size:11px; color:var(--muted); margin-bottom:4px">
-            ${diffChasu ? chasuBadges(new Set([diffChasu])) : ''} 행${diffRow}:
-            ${diffParts.map(p=>`<span class="chip">${p}</span>`).join('')}
-          </div>
-          ${detailHtml}
+          ${detailHtml ? `<div style="padding:8px 10px; background:rgba(239,68,68,.08); border-radius:6px;">${detailHtml}</div>` : ''}
         </div>`;
-      }).join('')
+      }).join('<div style="height:4px"></div>')
     );
   }
 
@@ -1339,26 +1351,28 @@ function renderCategoryQAResult(issues, container) {
         ];
         const copy = copyLines.join('\n');
         const dupSet = new Set(dups.map(d => d.part));
-        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
-          <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
+            background:rgba(239,68,68,.04); border:1px solid rgba(239,68,68,.18);
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
             <span class="badge err">중복</span>
             레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
             <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
           </div>
-          <div style="margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">중복 항목:</span>
+          <div style="margin-bottom:8px; padding:8px 10px; background:rgba(239,68,68,.08); border-radius:6px;">
+            <span style="font-size:11px; color:var(--err); font-weight:700; margin-right:6px;">중복 항목</span>
             ${dups.map(d => `<span class="chip-dup">${d.part}<span class="dup-cnt">${d.count}</span></span>`).join('')}
           </div>
-          <div>
-            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
+          <div style="padding:8px 10px; background:var(--surface2); border-radius:6px;">
+            <span style="font-size:11px; color:var(--muted); font-weight:700; margin-right:6px;">전체 목록</span>
             ${allParts.map(p => dupSet.has(p)
               ? `<span class="chip-dup">${p}</span>`
               : `<span class="chip">${p}</span>`
             ).join('')}
           </div>
         </div>`;
-      }).join('')
+      }).join('<div style="height:4px"></div>')
     );
   }
 
