@@ -271,6 +271,20 @@
     transition: all .15s; white-space: nowrap; flex-shrink: 0;
   }
   .copy-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,126,248,.1); }
+
+  /* 중복 하이라이트 칩 */
+  .chip-dup {
+    display:inline-block; padding:1px 7px; border-radius:12px;
+    font-size:10px; font-weight:700; margin:1px;
+    background:rgba(239,68,68,.15); color:var(--err);
+    border:1px solid rgba(239,68,68,.4);
+  }
+  .chip-dup .dup-cnt {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; border-radius:50%;
+    background:var(--err); color:#fff; font-size:9px; font-weight:800;
+    margin-left:3px;
+  }
 </style>
 </head>
 <body>
@@ -568,6 +582,8 @@ function runListQA(rows, cv, container) {
     partDup:    [],
     setDup:     [],
     partDiff:   [],
+    layerDup:   [],
+    nameDup:    [],
   };
 
   // 헤더에서 카테고리/상세카테고리 열 탐색 (row1 기준)
@@ -641,7 +657,6 @@ function runListQA(rows, cv, container) {
   });
 
   // ④ 도면번호 중복 — 여러 차수에 같은 세트코드 등장
-  // (차수 필터 없이 전체 스캔해야 여러 차수에 걸쳐 있는지 알 수 있음)
   const setCodeChasuMap = {};
   for (let r = 2; r < rows.length; r++) {
     const row     = rows[r];
@@ -690,13 +705,54 @@ function runListQA(rows, cv, container) {
     if (diffs.length > 0) issues.partDiff.push({ setCode: sc, setsArr });
   });
 
+  // ⑥ 레이어명 내 부품코드 중복
+  // ⑦ 레이어명 내 부품명(N열=13) 중복
+  {
+    const COL_NAME = 13; // N열
+    let curLayer = '', curParts = [], curNames = [], curRow = -1, curChasu = '';
+    const flushL = () => {
+      if (!curLayer) return;
+      // 부품코드 중복
+      if (curParts.length) {
+        const dm = {};
+        curParts.forEach(p => { dm[p] = (dm[p]||0)+1; });
+        const dups = Object.entries(dm).filter(([,c])=>c>1).map(([p,c])=>({part:p,count:c}));
+        if (dups.length) issues.layerDup.push({ layer:curLayer, row:curRow, chasu:curChasu, dups, allParts:curParts.slice() });
+      }
+      // 부품명 중복
+      if (curNames.length) {
+        const nm = {};
+        curNames.forEach(n => { nm[n] = (nm[n]||0)+1; });
+        const dups = Object.entries(nm).filter(([,c])=>c>1).map(([n,c])=>({part:n,count:c}));
+        if (dups.length) issues.nameDup.push({ layer:curLayer, row:curRow, chasu:curChasu, dups, allParts:curNames.slice() });
+      }
+    };
+    for (let r = 2; r < rows.length; r++) {
+      const row      = rows[r]; if (!row) continue;
+      const chasu    = cv(row, COL_CHASU);
+      const layerVal = cv(row, COL_SETCODE);   // D열 = 레이어(세트코드)
+      const partVal  = cv(row, COL_PARTCODE);  // I열 = 부품코드
+      const nameVal  = cv(row, COL_NAME);      // N열 = 부품명
+      if (layerVal) {
+        flushL();
+        curLayer = layerVal; curParts = []; curNames = []; curRow = r+1; curChasu = chasu;
+      }
+      if (curLayer && chasu && VALID_CHASU.has(chasu)) {
+        if (partVal) curParts.push(partVal.toUpperCase());
+        if (nameVal) curNames.push(nameVal);
+      }
+    }
+    flushL();
+  }
+
   renderListQAResult(issues, container);
 }
 
 function renderListQAResult(issues, container) {
   const total = issues.catTypo.length + issues.catWrong.length +
                 issues.subcatTypo.length + issues.partDup.length +
-                issues.setDup.length + issues.partDiff.length;
+                issues.setDup.length + issues.partDiff.length +
+                (issues.layerDup||[]).length + (issues.nameDup||[]).length;
 
   if (total === 0) {
     container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 중복·불일치·오타 항목이 발견되지 않았습니다.</div></div>`;
@@ -810,6 +866,75 @@ function renderListQAResult(issues, container) {
     );
   }
 
+  if (issues.layerDup && issues.layerDup.length > 0) {
+    html += qaGroup('⑥ 레이어명 내 부품코드 중복', issues.layerDup.length, 'err',
+      issues.layerDup.map(({layer, row, chasu, dups, allParts}) => {
+        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
+        const copyLines = [
+          `[중복] 레이어명 "${layer}" (행${row}${chasu?' '+chasu+'차':''})`,
+          `  중복 항목: ${dupList}`,
+          `  전체 목록: ${allParts.join(', ')}`
+        ];
+        const copy = copyLines.join('\n');
+        const dupSet = new Set(dups.map(d => d.part));
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            ${chasu ? chasuBadges(new Set([chasu])) : ''}
+            <span class="badge err">중복</span>
+            레이어명 <b>"${layer}"</b>
+            <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
+          </div>
+          <div style="margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">중복 항목:</span>
+            ${dups.map(d => `<span class="chip-dup">${d.part}<span class="dup-cnt">${d.count}</span></span>`).join('')}
+          </div>
+          <div>
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
+            ${allParts.map(p => dupSet.has(p)
+              ? `<span class="chip-dup">${p}</span>`
+              : `<span class="chip">${p}</span>`
+            ).join('')}
+          </div>
+        </div>`;
+      }).join('')
+    );
+  }
+
+
+  if (issues.nameDup && issues.nameDup.length > 0) {
+    html += qaGroup('⑦ 레이어명 내 부품명(N열) 중복', issues.nameDup.length, 'err',
+      issues.nameDup.map(({layer, row, chasu, dups, allParts}) => {
+        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
+        const copyLines = [
+          `[중복] 레이어명 "${layer}" 부품명 중복 (행${row}${chasu?' '+chasu+'차':''})`,
+          `  중복 항목: ${dupList}`,
+          `  전체 목록: ${allParts.join(', ')}`
+        ];
+        const copy = copyLines.join('\n');
+        const dupSet = new Set(dups.map(d => d.part));
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            ${chasu ? chasuBadges(new Set([chasu])) : ''}
+            <span class="badge err">중복</span>
+            레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
+            <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
+          </div>
+          <div style="margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">중복 항목:</span>
+            ${dups.map(d => `<span class="chip-dup">${d.part}<span class="dup-cnt">${d.count}</span></span>`).join('')}
+          </div>
+          <div>
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
+            ${allParts.map(p => dupSet.has(p)
+              ? `<span class="chip-dup">${p}</span>`
+              : `<span class="chip">${p}</span>`
+            ).join('')}
+          </div>
+        </div>`;
+      }).join('')
+    );
+  }
+
   html += '</div>';
   container.innerHTML = html;
 }
@@ -852,6 +977,8 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     catMismatch:       [],
     codeCatMismatch:   [],
     layerPartMismatch: [],
+    layerDup:          [],   // ← 추가: 레이어 내 부품코드 중복
+    nameDup:           [],   // ← 추가: 레이어 내 부품명 중복
   };
 
   // 부품코드 컬럼 탐색
@@ -913,17 +1040,64 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
-  // ── 레이어 내 부품코드 불일치 (선택된 차수만) ──
+  // ── 레이어 내 부품코드 불일치 + 중복 검사 (선택된 차수만) ──
+  //
+  // 엑셀 구조:
+  //   레이어명(colName)은 해당 레이어의 첫 행에만 값이 있고,
+  //   그 아래 부품 행들은 레이어명 셀이 비어있다.
+  //   → layerVal 이 있는 행이 나올 때마다 = 새 레이어 블록 시작.
+  //   → 같은 레이어명이 다른 도면번호로 다시 등장해도
+  //     그 행에 layerVal이 채워져 있으므로 자동으로 새 블록 분리됨.
+
   const layerPartMap = {};
-  let currentLayer = '', currentParts = [], currentLayerStartRow = -1, currentLayerChasu = '';
+  let currentLayer = '', currentParts = [], currentNames = [],
+      currentLayerStartRow = -1, currentLayerChasu = '';
+
+  const COL_PARTNAME = 13; // N열 = 부품명
 
   const flushLayer = () => {
-    if (!currentLayer) return;
+    if (!currentLayer || (!currentParts.length && !currentNames.length)) return;
+
+    // ── 6번: 블록 내 부품코드 실제 중복 감지 ──
+    if (currentParts.length) {
+      const dupMap = {};
+      currentParts.forEach(p => { dupMap[p] = (dupMap[p] || 0) + 1; });
+      const dups = Object.entries(dupMap)
+        .filter(([, cnt]) => cnt > 1)
+        .map(([p, cnt]) => ({ part: p, count: cnt }));
+      if (dups.length) {
+        issues.layerDup.push({
+          layer:    currentLayer,
+          row:      currentLayerStartRow,
+          chasu:    currentLayerChasu,
+          dups,
+          allParts: currentParts.slice()
+        });
+      }
+    }
+
+    // ── 7번: 블록 내 부품명(N열) 중복 감지 ──
+    if (currentNames.length) {
+      const nm = {};
+      currentNames.forEach(n => { nm[n] = (nm[n]||0)+1; });
+      const dups = Object.entries(nm).filter(([,c])=>c>1).map(([n,c])=>({part:n,count:c}));
+      if (dups.length) {
+        issues.nameDup.push({
+          layer:    currentLayer,
+          row:      currentLayerStartRow,
+          chasu:    currentLayerChasu,
+          dups,
+          allParts: currentNames.slice()
+        });
+      }
+    }
+
+    // 5번 불일치 비교용 map 등록 (중복 제거 후 정렬)
     if (!layerPartMap[currentLayer]) layerPartMap[currentLayer] = { occurrences: [] };
     layerPartMap[currentLayer].occurrences.push({
       row:   currentLayerStartRow,
       chasu: currentLayerChasu,
-      parts: currentParts.slice().sort()
+      parts: [...new Set(currentParts)].sort()
     });
   };
 
@@ -933,29 +1107,32 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     const layerVal = colName >= 0 ? cv(row, colName) : '';
     const partVal  = colPartCode >= 0 ? cv(row, colPartCode) : '';
 
-    // 레이어명이 바뀌면 현재까지 수집한 내용을 flush
-    if (layerVal && layerVal !== currentLayer) {
+    // layerVal 이 있는 행 = 새 레이어 블록 시작 → 이전 블록 flush
+    if (layerVal) {
       flushLayer();
       currentLayer         = layerVal;
       currentParts         = [];
+      currentNames         = [];
       currentLayerStartRow = r + 1;
       currentLayerChasu    = chasu;
     }
 
-    // C열 차수 없거나 선택 안 된 차수면 부품코드 수집 안 함
-    if (partVal && chasu && VALID_CHASU.has(chasu)) {
-      currentParts.push(partVal);
+    // 선택된 차수의 부품코드 + 부품명(N열) 수집
+    if (currentLayer && chasu && VALID_CHASU.has(chasu)) {
+      if (partVal) currentParts.push(partVal);
+      const nameVal = cv(row, COL_PARTNAME);
+      if (nameVal) currentNames.push(nameVal);
     }
   }
   flushLayer();
 
+  // ── 5번: 차수 간 레이어 부품코드 불일치 ──
   Object.entries(layerPartMap).forEach(([layer, data]) => {
     const occs = data.occurrences;
     if (occs.length < 2) return;
     const ref = occs[0].parts.join(',');
     occs.forEach((occ, i) => {
       if (i === 0) return;
-      // 둘 중 하나라도 차수 없으면 쌍 제외
       if (!occs[0].chasu || !occ.chasu) return;
       if (occ.parts.join(',') !== ref) {
         issues.layerPartMismatch.push({
@@ -977,10 +1154,11 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
 function renderCategoryQAResult(issues, container) {
   const total = issues.catWrong.length + issues.catTypo.length +
                 issues.subcatTypo.length + issues.catMismatch.length +
-                issues.codeCatMismatch.length + issues.layerPartMismatch.length;
+                issues.codeCatMismatch.length + issues.layerPartMismatch.length +
+                (issues.layerDup||[]).length + (issues.nameDup||[]).length;
 
   if (total === 0) {
-    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 오류·오타·불일치 항목이 없습니다.</div></div>`;
+    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 오류·오타·불일치·중복 항목이 없습니다.</div></div>`;
     return;
   }
 
@@ -1107,6 +1285,78 @@ function renderCategoryQAResult(issues, container) {
             ${diffParts.map(p=>`<span class="chip">${p}</span>`).join('')}
           </div>
           ${detailHtml}
+        </div>`;
+      }).join('')
+    );
+  }
+
+  // ── 6번: 레이어 내 부품코드 중복 ──
+  if (issues.layerDup.length > 0) {
+    html += qaGroup('6. 같은 레이어명 내 부품코드 중복', issues.layerDup.length, 'err',
+      issues.layerDup.map(({layer, row, chasu, dups, allParts}) => {
+        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
+        const copyLines = [
+          `[중복] 레이어명 "${layer}" (행${row}${chasu?' '+chasu+'차':''})`,
+          `  중복 항목: ${dupList}`,
+          `  전체 목록: ${allParts.join(', ')}`
+        ];
+        const copy = copyLines.join('\n');
+
+        // 중복 부품 Set (하이라이트용)
+        const dupSet = new Set(dups.map(d => d.part));
+
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            ${chasu ? chasuBadges(new Set([chasu])) : ''}
+            <span class="badge err">중복</span>
+            레이어명 <b>"${layer}"</b>
+            <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
+          </div>
+          <div style="margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">중복 항목:</span>
+            ${dups.map(d => `<span class="chip-dup">${d.part}<span class="dup-cnt">${d.count}</span></span>`).join('')}
+          </div>
+          <div>
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
+            ${allParts.map(p => dupSet.has(p)
+              ? `<span class="chip-dup">${p}</span>`
+              : `<span class="chip">${p}</span>`
+            ).join('')}
+          </div>
+        </div>`;
+      }).join('')
+    );
+  }
+
+  if (issues.nameDup && issues.nameDup.length > 0) {
+    html += qaGroup('7. 레이어명 내 부품명(N열) 중복', issues.nameDup.length, 'err',
+      issues.nameDup.map(({layer, row, chasu, dups, allParts}) => {
+        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
+        const copyLines = [
+          `[중복] 레이어명 "${layer}" 부품명 중복 (행${row}${chasu?' '+chasu+'차':''})`,
+          `  중복 항목: ${dupList}`,
+          `  전체 목록: ${allParts.join(', ')}`
+        ];
+        const copy = copyLines.join('\n');
+        const dupSet = new Set(dups.map(d => d.part));
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            ${chasu ? chasuBadges(new Set([chasu])) : ''}
+            <span class="badge err">중복</span>
+            레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
+            <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
+          </div>
+          <div style="margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">중복 항목:</span>
+            ${dups.map(d => `<span class="chip-dup">${d.part}<span class="dup-cnt">${d.count}</span></span>`).join('')}
+          </div>
+          <div>
+            <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
+            ${allParts.map(p => dupSet.has(p)
+              ? `<span class="chip-dup">${p}</span>`
+              : `<span class="chip">${p}</span>`
+            ).join('')}
+          </div>
         </div>`;
       }).join('')
     );
