@@ -285,6 +285,23 @@
     background:var(--err); color:#fff; font-size:9px; font-weight:800;
     margin-left:3px;
   }
+
+  /* 용량 불일치 강조 */
+  .cap-from-name {
+    display:inline-block; padding:1px 8px; border-radius:10px;
+    font-size:11px; font-weight:700;
+    background:rgba(245,158,11,.18); color:var(--warn);
+    border:1px solid rgba(245,158,11,.4);
+  }
+  .cap-from-g {
+    display:inline-block; padding:1px 8px; border-radius:10px;
+    font-size:11px; font-weight:700;
+    background:rgba(239,68,68,.18); color:var(--err);
+    border:1px solid rgba(239,68,68,.4);
+  }
+  .cap-arrow {
+    display:inline-block; margin:0 4px; color:var(--muted); font-size:13px;
+  }
 </style>
 </head>
 <body>
@@ -493,6 +510,39 @@ function chasuBadges(chasuSet) {
   return [...chasuSet].sort().map(c => `<span class="chasu-tag">${c}차</span>`).join('');
 }
 
+// ─── ★ 용량 추출 유틸 ────────────────────────────────────
+// 문자열에서 용량(숫자+단위) 추출
+// 반환: { num: float, unit: 'g'|'ml'|'l'|'oz' } 또는 null
+function extractCapacity(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  // 숫자(소수점포함) + 단위 패턴 전체 추출
+  const matches = s.match(/(\d+(?:\.\d+)?)\s*(ml|mL|ML|Ml|g|G|L|l(?!e)|oz|OZ|Oz)\b/g);
+  if (!matches || !matches.length) return null;
+  // 마지막 용량 값을 기준으로 사용 (제품명에서 용량이 보통 뒤쪽에 위치)
+  const last = matches[matches.length - 1];
+  const m = last.match(/(\d+(?:\.\d+)?)\s*(ml|mL|ML|Ml|g|G|L|l(?!e)|oz|OZ|Oz)/);
+  if (!m) return null;
+  return { num: parseFloat(m[1]), unit: normalizeCapUnit(m[2]) };
+}
+
+// 단위 정규화: 대소문자 통일
+function normalizeCapUnit(u) {
+  if (!u) return '';
+  const lo = u.toLowerCase();
+  if (lo === 'g')  return 'g';
+  if (lo === 'ml') return 'ml';
+  if (lo === 'l')  return 'l';
+  if (lo === 'oz') return 'oz';
+  return lo;
+}
+
+// 두 용량이 같은지 비교 (단위 다르면 false)
+function capacityMatch(a, b) {
+  if (!a || !b) return true; // 어느 한쪽 없으면 검사 불가 → 무시
+  return a.num === b.num && a.unit === b.unit;
+}
+
 // ─── NAV ─────────────────────────────────────────────────
 function goStep(n) {
   [1,2,3].forEach(i => {
@@ -569,24 +619,27 @@ function runExcelQA(rows) {
 
 // ─── 세트-부품 리스트 품질 검사 ──────────────────────────
 function runListQA(rows, cv, container) {
-  const COL_CHASU    = 2;
-  const COL_SETCODE  = 3;
-  const COL_PARTCODE = 8;
+  const COL_CHASU    = 2;  // C열
+  const COL_SETCODE  = 3;  // D열
+  const COL_PRODNAME = 5;  // F열 — 제품명 ★
+  const COL_CAPACITY = 6;  // G열 — 용량 ★
+  const COL_PARTCODE = 8;  // I열
 
   const VALID_CHASU = getSelectedChasu();
 
   const issues = {
-    catTypo:    [],
-    catWrong:   [],
-    subcatTypo: [],
-    partDup:    [],
-    setDup:     [],
-    partDiff:   [],
-    layerDup:   [],
-    nameDup:    [],
+    catTypo:           [],
+    catWrong:          [],
+    subcatTypo:        [],
+    partDup:           [],
+    setDup:            [],
+    partDiff:          [],
+    layerDup:          [],
+    nameDup:           [],
+    capacityMismatch:  [],  // ★ 8번: 제품명 용량 ↔ G열 용량 불일치
   };
 
-  // 헤더에서 카테고리/상세카테고리 열 탐색 (row1 기준)
+  // 헤더에서 카테고리/상세카테고리 열 탐색
   let colCat = -1, colSubcat = -1;
   if (rows[1]) {
     rows[1].forEach((v, i) => {
@@ -606,11 +659,26 @@ function runListQA(rows, cv, container) {
     const partCode = cv(row, COL_PARTCODE);
 
     if (!setCode && !partCode) continue;
-
-    // C열 차수가 없으면 무시
     if (!chasu) continue;
-    // 선택된 차수가 아니면 건너뜀
     if (!VALID_CHASU.has(chasu)) continue;
+
+    // ★ 8번: 제품명 vs G열 용량 불일치 검사
+    const prodName  = cv(row, COL_PRODNAME);
+    const gCapacity = cv(row, COL_CAPACITY);
+    if (prodName && gCapacity) {
+      const capFromName = extractCapacity(prodName);
+      const capFromG    = extractCapacity(gCapacity);
+      if (capFromName && capFromG && !capacityMatch(capFromName, capFromG)) {
+        issues.capacityMismatch.push({
+          row: r + 1,
+          chasu,
+          prodName,
+          gCapacity,
+          capFromName,
+          capFromG,
+        });
+      }
+    }
 
     // 카테고리 오타 검사
     if (colCat >= 0) {
@@ -656,7 +724,7 @@ function runListQA(rows, cv, container) {
     });
   });
 
-  // ④ 도면번호 중복 — 여러 차수에 같은 세트코드 등장
+  // ④ 도면번호 중복
   const setCodeChasuMap = {};
   for (let r = 2; r < rows.length; r++) {
     const row     = rows[r];
@@ -674,7 +742,7 @@ function runListQA(rows, cv, container) {
     }
   });
 
-  // ⑤ 같은 도면번호인데 차수별 부품코드 다름 (선택된 차수만 비교)
+  // ⑤ 같은 도면번호인데 차수별 부품코드 다름
   const setCodePerChasu = {};
   let currentSet2 = null;
   for (let r = 2; r < rows.length; r++) {
@@ -682,11 +750,9 @@ function runListQA(rows, cv, container) {
     const chasu    = cv(row, COL_CHASU);
     const setCode  = cv(row, COL_SETCODE);
     const partCode = cv(row, COL_PARTCODE);
-
     if (setCode) currentSet2 = setCode.toUpperCase();
     if (!currentSet2 || !partCode || !chasu) continue;
     if (!VALID_CHASU.has(chasu)) continue;
-
     const key = `${currentSet2}__${chasu}`;
     if (!setCodePerChasu[key]) setCodePerChasu[key] = new Set();
     setCodePerChasu[key].add(partCode.toUpperCase());
@@ -705,21 +771,18 @@ function runListQA(rows, cv, container) {
     if (diffs.length > 0) issues.partDiff.push({ setCode: sc, setsArr });
   });
 
-  // ⑥ 레이어명 내 부품코드 중복
-  // ⑦ 레이어명 내 부품명(N열=13) 중복
+  // ⑥ 레이어명 내 부품코드 중복 / ⑦ 부품명 중복
   {
-    const COL_NAME = 13; // N열
+    const COL_NAME = 13;
     let curLayer = '', curParts = [], curNames = [], curRow = -1, curChasu = '';
     const flushL = () => {
       if (!curLayer) return;
-      // 부품코드 중복
       if (curParts.length) {
         const dm = {};
         curParts.forEach(p => { dm[p] = (dm[p]||0)+1; });
         const dups = Object.entries(dm).filter(([,c])=>c>1).map(([p,c])=>({part:p,count:c}));
         if (dups.length) issues.layerDup.push({ layer:curLayer, row:curRow, chasu:curChasu, dups, allParts:curParts.slice() });
       }
-      // 부품명 중복
       if (curNames.length) {
         const nm = {};
         curNames.forEach(n => { nm[n] = (nm[n]||0)+1; });
@@ -730,9 +793,9 @@ function runListQA(rows, cv, container) {
     for (let r = 2; r < rows.length; r++) {
       const row      = rows[r]; if (!row) continue;
       const chasu    = cv(row, COL_CHASU);
-      const layerVal = cv(row, COL_SETCODE);   // D열 = 레이어(세트코드)
-      const partVal  = cv(row, COL_PARTCODE);  // I열 = 부품코드
-      const nameVal  = cv(row, COL_NAME);      // N열 = 부품명
+      const layerVal = cv(row, COL_SETCODE);
+      const partVal  = cv(row, COL_PARTCODE);
+      const nameVal  = cv(row, COL_NAME);
       if (layerVal) {
         flushL();
         curLayer = layerVal; curParts = []; curNames = []; curRow = r+1; curChasu = chasu;
@@ -752,10 +815,11 @@ function renderListQAResult(issues, container) {
   const total = issues.catTypo.length + issues.catWrong.length +
                 issues.subcatTypo.length + issues.partDup.length +
                 issues.setDup.length + issues.partDiff.length +
-                (issues.layerDup||[]).length + (issues.nameDup||[]).length;
+                (issues.layerDup||[]).length + (issues.nameDup||[]).length +
+                (issues.capacityMismatch||[]).length;
 
   if (total === 0) {
-    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 중복·불일치·오타 항목이 발견되지 않았습니다.</div></div>`;
+    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 중복·불일치·오타·용량 항목이 발견되지 않았습니다.</div></div>`;
     return;
   }
 
@@ -906,7 +970,6 @@ function renderListQAResult(issues, container) {
     );
   }
 
-
   if (issues.nameDup && issues.nameDup.length > 0) {
     html += qaGroup('⑦ 레이어명 내 부품명(N열) 중복', issues.nameDup.length, 'err',
       issues.nameDup.map(({layer, row, chasu, dups, allParts}) => {
@@ -943,6 +1006,34 @@ function renderListQAResult(issues, container) {
     );
   }
 
+  // ★ 8번: 용량 불일치
+  if (issues.capacityMismatch && issues.capacityMismatch.length > 0) {
+    html += qaGroup('⑧ 제품명 용량 ↔ G열 용량 불일치', issues.capacityMismatch.length, 'err',
+      issues.capacityMismatch.map(({row, chasu, prodName, gCapacity, capFromName, capFromG}) => {
+        const nameStr = `${capFromName.num}${capFromName.unit}`;
+        const gStr    = `${capFromG.num}${capFromG.unit}`;
+        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [용량불일치] 제품명: "${prodName}" (${nameStr}) / G열: ${gCapacity} (${gStr})`;
+        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            ${chasu ? chasuBadges(new Set([chasu])) : ''}
+            <span class="badge err">용량불일치</span>
+            <span style="color:var(--muted); font-size:11px; margin:0 4px;">제품명</span>
+            <b style="font-size:12px">${escHtml(prodName)}</b>
+            <br>
+            <span style="display:inline-flex; align-items:center; gap:6px; margin-top:6px;">
+              <span style="font-size:11px; color:var(--muted);">제품명에서:</span>
+              <span class="cap-from-name">${nameStr}</span>
+              <span class="cap-arrow">≠</span>
+              <span style="font-size:11px; color:var(--muted);">G열:</span>
+              <span class="cap-from-g">${escHtml(gCapacity)}</span>
+            </span>
+          </div>
+        </div>`;
+      }).join('')
+    );
+  }
+
   html += '</div>';
   container.innerHTML = html;
 }
@@ -951,6 +1042,10 @@ function renderListQAResult(issues, container) {
 function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
   const dataStart   = headerRowIdx + 1;
   const VALID_CHASU = getSelectedChasu();
+
+  // F열(인덱스5)=제품명, G열(인덱스6)=용량 — 고정 컬럼
+  const COL_PRODNAME_CAT = 5;
+  const COL_CAPACITY_CAT = 6;
 
   // 차수 컬럼 탐색
   let colChasu = 2;
@@ -985,8 +1080,9 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     catMismatch:       [],
     codeCatMismatch:   [],
     layerPartMismatch: [],
-    layerDup:          [],   // ← 추가: 레이어 내 부품코드 중복
-    nameDup:           [],   // ← 추가: 레이어 내 부품명 중복
+    layerDup:          [],
+    nameDup:           [],
+    capacityMismatch:  [],  // ★ 8번 추가
   };
 
   // 부품코드 컬럼 탐색
@@ -1002,7 +1098,7 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
-  // ── 카테고리/오타/불일치 검사 (선택된 차수만) ──
+  // ── 카테고리/오타/불일치 + ★ 용량 불일치 검사 ──
   for (let r = dataStart; r < rows.length; r++) {
     const row      = rows[r]; if (!row) continue;
     const chasu    = cv(row, colChasu);
@@ -1012,9 +1108,20 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
 
     if (!cat && !subcat && !name) continue;
     if (cat && cat.toUpperCase() === 'SEED') continue;
-
-    // C열 차수 없으면 무시, 선택된 차수만 검사
     if (!chasu || !VALID_CHASU.has(chasu)) continue;
+
+    // ★ 8번: F열 제품명 vs G열 용량 불일치
+    const prodName  = cv(row, COL_PRODNAME_CAT);
+    const gCapacity = cv(row, COL_CAPACITY_CAT);
+    if (prodName && gCapacity) {
+      const capFromName = extractCapacity(prodName);
+      const capFromG    = extractCapacity(gCapacity);
+      if (capFromName && capFromG && !capacityMatch(capFromName, capFromG)) {
+        issues.capacityMismatch.push({
+          row: r + 1, chasu, prodName, gCapacity, capFromName, capFromG,
+        });
+      }
+    }
 
     if (cat && !VALID_CATEGORIES.has(cat)) {
       const typo = findTypoSuggestion(cat, VALID_CATEGORIES);
@@ -1048,63 +1155,34 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
-  // ── 레이어 내 부품코드 불일치 + 중복 검사 (선택된 차수만) ──
-  //
-  // 엑셀 구조:
-  //   레이어명(colName)은 해당 레이어의 첫 행에만 값이 있고,
-  //   그 아래 부품 행들은 레이어명 셀이 비어있다.
-  //   → layerVal 이 있는 행이 나올 때마다 = 새 레이어 블록 시작.
-  //   → 같은 레이어명이 다른 도면번호로 다시 등장해도
-  //     그 행에 layerVal이 채워져 있으므로 자동으로 새 블록 분리됨.
-
+  // ── 레이어 내 부품코드 불일치 + 중복 검사 ──
   const layerPartMap = {};
   let currentLayer = '', currentParts = [], currentNames = [],
       currentLayerStartRow = -1, currentLayerChasu = '';
 
-  const COL_PARTNAME = 13; // N열 = 부품명
+  const COL_PARTNAME = 13;
 
   const flushLayer = () => {
     if (!currentLayer || (!currentParts.length && !currentNames.length)) return;
-
-    // ── 6번: 블록 내 부품코드 실제 중복 감지 ──
     if (currentParts.length) {
       const dupMap = {};
       currentParts.forEach(p => { dupMap[p] = (dupMap[p] || 0) + 1; });
-      const dups = Object.entries(dupMap)
-        .filter(([, cnt]) => cnt > 1)
-        .map(([p, cnt]) => ({ part: p, count: cnt }));
+      const dups = Object.entries(dupMap).filter(([, cnt]) => cnt > 1).map(([p, cnt]) => ({ part: p, count: cnt }));
       if (dups.length) {
-        issues.layerDup.push({
-          layer:    currentLayer,
-          row:      currentLayerStartRow,
-          chasu:    currentLayerChasu,
-          dups,
-          allParts: currentParts.slice()
-        });
+        issues.layerDup.push({ layer: currentLayer, row: currentLayerStartRow, chasu: currentLayerChasu, dups, allParts: currentParts.slice() });
       }
     }
-
-    // ── 7번: 블록 내 부품명(N열) 중복 감지 ──
     if (currentNames.length) {
       const nm = {};
       currentNames.forEach(n => { nm[n] = (nm[n]||0)+1; });
       const dups = Object.entries(nm).filter(([,c])=>c>1).map(([n,c])=>({part:n,count:c}));
       if (dups.length) {
-        issues.nameDup.push({
-          layer:    currentLayer,
-          row:      currentLayerStartRow,
-          chasu:    currentLayerChasu,
-          dups,
-          allParts: currentNames.slice()
-        });
+        issues.nameDup.push({ layer: currentLayer, row: currentLayerStartRow, chasu: currentLayerChasu, dups, allParts: currentNames.slice() });
       }
     }
-
-    // 5번 불일치 비교용 map 등록 (중복 제거 후 정렬)
     if (!layerPartMap[currentLayer]) layerPartMap[currentLayer] = { occurrences: [] };
     layerPartMap[currentLayer].occurrences.push({
-      row:   currentLayerStartRow,
-      chasu: currentLayerChasu,
+      row: currentLayerStartRow, chasu: currentLayerChasu,
       parts: [...new Set(currentParts)].sort()
     });
   };
@@ -1114,18 +1192,11 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     const chasu    = cv(row, colChasu);
     const layerVal = colName >= 0 ? cv(row, colName) : '';
     const partVal  = colPartCode >= 0 ? cv(row, colPartCode) : '';
-
-    // layerVal 이 있는 행 = 새 레이어 블록 시작 → 이전 블록 flush
     if (layerVal) {
       flushLayer();
-      currentLayer         = layerVal;
-      currentParts         = [];
-      currentNames         = [];
-      currentLayerStartRow = r + 1;
-      currentLayerChasu    = chasu;
+      currentLayer = layerVal; currentParts = []; currentNames = [];
+      currentLayerStartRow = r + 1; currentLayerChasu = chasu;
     }
-
-    // 선택된 차수의 부품코드 + 부품명(N열) 수집
     if (currentLayer && chasu && VALID_CHASU.has(chasu)) {
       if (partVal) currentParts.push(partVal);
       const nameVal = cv(row, COL_PARTNAME);
@@ -1134,7 +1205,6 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
   }
   flushLayer();
 
-  // ── 5번: 차수 간 레이어 부품코드 불일치 ──
   Object.entries(layerPartMap).forEach(([layer, data]) => {
     const occs = data.occurrences;
     if (occs.length < 2) return;
@@ -1145,12 +1215,8 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
       if (occ.parts.join(',') !== ref) {
         issues.layerPartMismatch.push({
           layer,
-          firstRow:   occs[0].row,
-          firstChasu: occs[0].chasu,
-          firstParts: occs[0].parts,
-          diffRow:    occ.row,
-          diffChasu:  occ.chasu,
-          diffParts:  occ.parts,
+          firstRow:   occs[0].row, firstChasu: occs[0].chasu, firstParts: occs[0].parts,
+          diffRow:    occ.row,     diffChasu:  occ.chasu,      diffParts:  occ.parts,
         });
       }
     });
@@ -1163,10 +1229,11 @@ function renderCategoryQAResult(issues, container) {
   const total = issues.catWrong.length + issues.catTypo.length +
                 issues.subcatTypo.length + issues.catMismatch.length +
                 issues.codeCatMismatch.length + issues.layerPartMismatch.length +
-                (issues.layerDup||[]).length + (issues.nameDup||[]).length;
+                (issues.layerDup||[]).length + (issues.nameDup||[]).length +
+                (issues.capacityMismatch||[]).length;
 
   if (total === 0) {
-    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 오류·오타·불일치·중복 항목이 없습니다.</div></div>`;
+    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 오류·오타·불일치·중복·용량 항목이 없습니다.</div></div>`;
     return;
   }
 
@@ -1302,7 +1369,6 @@ function renderCategoryQAResult(issues, container) {
     );
   }
 
-  // ── 6번: 레이어 내 부품코드 중복 ──
   if (issues.layerDup.length > 0) {
     html += qaGroup('6. 같은 레이어명 내 부품코드 중복', issues.layerDup.length, 'err',
       issues.layerDup.map(({layer, row, chasu, dups, allParts}) => {
@@ -1313,10 +1379,7 @@ function renderCategoryQAResult(issues, container) {
           `  전체 목록: ${allParts.join(', ')}`
         ];
         const copy = copyLines.join('\n');
-
-        // 중복 부품 Set (하이라이트용)
         const dupSet = new Set(dups.map(d => d.part));
-
         return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
           <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -1376,8 +1439,41 @@ function renderCategoryQAResult(issues, container) {
     );
   }
 
+  // ★ 8번: 용량 불일치
+  if (issues.capacityMismatch && issues.capacityMismatch.length > 0) {
+    html += qaGroup('8. 제품명 용량 ↔ G열 용량 불일치', issues.capacityMismatch.length, 'err',
+      issues.capacityMismatch.map(({row, chasu, prodName, gCapacity, capFromName, capFromG}) => {
+        const nameStr = `${capFromName.num}${capFromName.unit}`;
+        const gStr    = `${capFromG.num}${capFromG.unit}`;
+        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [용량불일치] 제품명: "${prodName}" (${nameStr}) / G열: ${gCapacity} (${gStr})`;
+        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+          <span class="row-info">행 ${row}</span>
+          <div class="qa-detail">
+            ${chasu ? chasuBadges(new Set([chasu])) : ''}
+            <span class="badge err">용량불일치</span>
+            <span style="color:var(--muted); font-size:11px; margin:0 4px;">제품명</span>
+            <b style="font-size:12px">${escHtml(prodName)}</b>
+            <br>
+            <span style="display:inline-flex; align-items:center; gap:6px; margin-top:6px;">
+              <span style="font-size:11px; color:var(--muted);">제품명에서:</span>
+              <span class="cap-from-name">${nameStr}</span>
+              <span class="cap-arrow">≠</span>
+              <span style="font-size:11px; color:var(--muted);">G열:</span>
+              <span class="cap-from-g">${escHtml(gCapacity)}</span>
+            </span>
+          </div>
+        </div>`;
+      }).join('')
+    );
+  }
+
   html += '</div>';
   container.innerHTML = html;
+}
+
+// HTML 이스케이프 헬퍼
+function escHtml(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function qaGroup(title, count, type, bodyHtml) {
@@ -1460,7 +1556,6 @@ function parseListRows(rows) {
     const setCode  = cv(row, COL_SETCODE);
     const partCode = cv(row, COL_PARTCODE);
 
-    // C열 차수 없으면 무시
     if (!chasu) continue;
     if (!VALID_CHASU.has(chasu)) continue;
 
