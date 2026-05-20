@@ -152,6 +152,7 @@
   .badge.warn { background:rgba(245,158,11,.15); color:var(--warn); }
   .badge.err  { background:rgba(239,68,68,.15);  color:var(--err);  }
   .badge.info { background:rgba(79,126,248,.15); color:var(--accent); }
+  .badge.muted { background:rgba(123,130,160,.15); color:var(--muted); }
 
   .chasu-tag {
     display:inline-block; padding:1px 6px; border-radius:10px; font-size:10px; font-weight:700;
@@ -198,24 +199,46 @@
     font-size:10px; font-weight:600; margin:1px;
     background:var(--surface2); color:var(--muted); border:1px solid var(--border);
   }
+
+  /* ── 필터 툴바 ─────────────────────────────────────── */
+  .filter-toolbar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    margin-bottom: 16px; display: none; flex-direction: column; gap: 10px;
+  }
+  .filter-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .filter-row-label {
+    font-size: 11px; font-weight: 700; color: var(--muted);
+    min-width: 72px; white-space: nowrap;
+  }
   .filter-btn {
-    padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+    padding: 5px 11px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--surface2); color: var(--muted);
     font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
     white-space: nowrap;
   }
   .filter-btn:hover { border-color: var(--accent); color: var(--text); }
-  .filter-btn.active {
-    background: rgba(79,126,248,.15); border-color: var(--accent); color: var(--accent);
+  .filter-btn.active { background: rgba(79,126,248,.15); border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active-err  { background:rgba(239,68,68,.15);  border-color:var(--err);  color:var(--err);  }
+  .filter-btn.active-warn { background:rgba(245,158,11,.15); border-color:var(--warn); color:var(--warn); }
+  .filter-btn.active-purple { background:rgba(124,92,252,.15); border-color:var(--accent2); color:var(--accent2); }
+  .filter-btn.active-ok { background:rgba(34,197,94,.15); border-color:var(--ok); color:var(--ok); }
+
+  /* 차수 버튼 */
+  .chasu-filter-btn {
+    padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted);
+    font-size: 11px; font-weight: 700; cursor: pointer; transition: all .15s;
+    white-space: nowrap;
   }
-  .filter-btn#fb-err.active       { background:rgba(239,68,68,.15);  border-color:var(--err);  color:var(--err);  }
-  .filter-btn#fb-setimg.active,
-  .filter-btn#fb-png160.active,
-  .filter-btn#fb-png300.active,
-  .filter-btn#fb-png500.active,
-  .filter-btn#fb-excel.active,
-  .filter-btn#fb-unity3d.active   { background:rgba(245,158,11,.15); border-color:var(--warn); color:var(--warn); }
-  .filter-btn#fb-nasa.active      { background:rgba(124,92,252,.15); border-color:var(--accent2); color:var(--accent2); }
+  .chasu-filter-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .chasu-filter-btn.active {
+    background: rgba(124,92,252,.2); border-color: var(--accent2); color: #c4b5fd;
+  }
+
+  #filter-status { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
 
   .result-card.filter-hidden { display: none; }
 
@@ -272,7 +295,6 @@
   }
   .copy-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,126,248,.1); }
 
-  /* 중복 하이라이트 칩 */
   .chip-dup {
     display:inline-block; padding:1px 7px; border-radius:12px;
     font-size:10px; font-weight:700; margin:1px;
@@ -286,7 +308,6 @@
     margin-left:3px;
   }
 
-  /* 용량 불일치 강조 */
   .cap-from-name {
     display:inline-block; padding:1px 8px; border-radius:10px;
     font-size:11px; font-weight:700;
@@ -301,6 +322,13 @@
   }
   .cap-arrow {
     display:inline-block; margin:0 4px; color:var(--muted); font-size:13px;
+  }
+
+  /* 세트 헤더 차수 뱃지 */
+  .set-chasu-badge {
+    display:inline-block; padding:2px 10px; border-radius:20px;
+    font-size:11px; font-weight:700; margin-left:4px;
+    background:rgba(124,92,252,.18); color:#c4b5fd; border:1px solid rgba(124,92,252,.4);
   }
 </style>
 </head>
@@ -374,11 +402,11 @@
       <div class="notice info">
         <span>📌</span>
         <div>
-          <b>파일명 패턴으로 자동 분류됩니다.</b><br>
+          <b>파일명 패턴으로 자동 분류됩니다.</b> 대소문자 구분 없이 인식합니다.<br>
           • <code>A1234.png</code> → <b>세트 이미지</b><br>
-          • <code>A1234_NAME.png</code> → 부품 PNG, 픽셀 크기로 구분: ≤160px → PNG160 &nbsp;/&nbsp; ≤350px → PNG300 &nbsp;/&nbsp; 나머지 → PNG500<br>
-          • <code>A1234_NAME_measure.xlsx</code> → 부품 엑셀<br>
-          • <code>A1234_NAME.unity3d</code> → Unity3D
+          • <code>A1234_NAME.png</code> → <b>부품 PNG</b><br>
+          • <code>A1234_NAME_measure.xlsx</code> → <b>부품 엑셀</b><br>
+          • <code>A1234_NAME.unity3d</code> → <b>Unity3D</b>
         </div>
       </div>
       <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -395,9 +423,7 @@
       <div id="classify-prog"><span class="spinner"></span><span id="classify-msg">분류 중...</span></div>
       <div class="bins">
         <div class="bin"><div class="bin-header"><span class="bin-label">🗂 세트이미지</span><span class="bin-count" id="cnt-setimg">0</span></div><div class="bin-files" id="bfiles-setimg"><div class="bin-empty">없음</div></div></div>
-        <div class="bin"><div class="bin-header"><span class="bin-label">🖼 PNG160</span><span class="bin-count" id="cnt-png160">0</span></div><div class="bin-files" id="bfiles-png160"><div class="bin-empty">없음</div></div></div>
-        <div class="bin"><div class="bin-header"><span class="bin-label">🖼 PNG300</span><span class="bin-count" id="cnt-png300">0</span></div><div class="bin-files" id="bfiles-png300"><div class="bin-empty">없음</div></div></div>
-        <div class="bin"><div class="bin-header"><span class="bin-label">🖼 PNG500</span><span class="bin-count" id="cnt-png500">0</span></div><div class="bin-files" id="bfiles-png500"><div class="bin-empty">없음</div></div></div>
+        <div class="bin"><div class="bin-header"><span class="bin-label">🖼 PNG (부품)</span><span class="bin-count" id="cnt-png">0</span></div><div class="bin-files" id="bfiles-png"><div class="bin-empty">없음</div></div></div>
         <div class="bin"><div class="bin-header"><span class="bin-label">📊 Excel</span><span class="bin-count" id="cnt-excel">0</span></div><div class="bin-files" id="bfiles-excel"><div class="bin-empty">없음</div></div></div>
         <div class="bin"><div class="bin-header"><span class="bin-label">🎮 Unity3D</span><span class="bin-count" id="cnt-unity3d">0</span></div><div class="bin-files" id="bfiles-unity3d"><div class="bin-empty">없음</div></div></div>
         <div class="bin"><div class="bin-header"><span class="bin-label">❓ 미분류</span><span class="bin-count" id="cnt-unknown">0</span></div><div class="bin-files" id="bfiles-unknown"><div class="bin-empty">없음</div></div></div>
@@ -411,19 +437,42 @@
 
   <!-- STEP 3 -->
   <div class="panel" id="panel3">
-    <div id="result-toolbar" style="display:none; margin-bottom:14px; align-items:center; gap:8px; flex-wrap:wrap;">
-      <span style="font-size:12px; font-weight:700; color:var(--muted); margin-right:4px;">필터</span>
-      <button class="filter-btn" id="fb-all"     onclick="setFilter('all')">📋 전체</button>
-      <button class="filter-btn" id="fb-err"     onclick="setFilter('err')">🔴 오류만</button>
-      <button class="filter-btn" id="fb-setimg"  onclick="setFilter('setimg')">🗂 세트이미지 없음</button>
-      <button class="filter-btn" id="fb-png160"  onclick="setFilter('png160')">🖼 PNG160 없음</button>
-      <button class="filter-btn" id="fb-png300"  onclick="setFilter('png300')">🖼 PNG300 없음</button>
-      <button class="filter-btn" id="fb-png500"  onclick="setFilter('png500')">🖼 PNG500 없음</button>
-      <button class="filter-btn" id="fb-excel"   onclick="setFilter('excel')">📊 엑셀 없음</button>
-      <button class="filter-btn" id="fb-unity3d" onclick="setFilter('unity3d')">🎮 Unity3D 없음</button>
-      <button class="filter-btn" id="fb-nasa"    onclick="setFilter('nasa')">🔩 나사값 불일치</button>
-      <span id="filter-status" style="font-size:12px; color:var(--muted); margin-left:4px;"></span>
+
+    <!-- ★ 필터 툴바 (3단 구성) -->
+    <div class="filter-toolbar" id="result-toolbar">
+
+      <!-- 행 1: 상태 필터 -->
+      <div class="filter-row">
+        <span class="filter-row-label">📋 상태</span>
+        <button class="filter-btn active" id="fb-all"     onclick="setTypeFilter('all')">전체</button>
+        <button class="filter-btn" id="fb-err"            onclick="setTypeFilter('err')">🔴 오류만</button>
+        <button class="filter-btn" id="fb-setimg"         onclick="setTypeFilter('setimg')">🗂 세트이미지 없음</button>
+        <button class="filter-btn" id="fb-png"            onclick="setTypeFilter('png')">🖼 PNG 없음</button>
+        <button class="filter-btn" id="fb-excel"          onclick="setTypeFilter('excel')">📊 엑셀 없음</button>
+        <button class="filter-btn" id="fb-unity3d"        onclick="setTypeFilter('unity3d')">🎮 Unity3D 없음</button>
+        <button class="filter-btn" id="fb-nasa"           onclick="setTypeFilter('nasa')">🔩 나사값 불일치</button>
+      </div>
+
+      <!-- 행 2: 업로드 파일 필터 ★ NEW -->
+      <div class="filter-row">
+        <span class="filter-row-label">📂 업로드</span>
+        <button class="filter-btn" id="fb-uploaded"       onclick="setTypeFilter('uploaded')">📂 업로드된 파일 있는 세트만</button>
+        <button class="filter-btn" id="fb-no-upload"      onclick="setTypeFilter('no-upload')">📭 파일 하나도 없는 세트</button>
+        <span style="font-size:11px; color:var(--muted); margin-left:4px;">— 실제로 업로드한 파일 기준</span>
+      </div>
+
+      <!-- 행 3: 차수 필터 ★ NEW -->
+      <div class="filter-row" id="chasu-filter-row" style="display:none">
+        <span class="filter-row-label">🗓 차수</span>
+        <button class="chasu-filter-btn active" id="cfb-all" onclick="setChasuFilter('all')">전체 차수</button>
+        <!-- 차수 버튼은 JS가 동적으로 추가 -->
+      </div>
+
+      <div class="filter-row" style="justify-content:flex-end; padding-top:4px; border-top:1px solid var(--border);">
+        <span id="filter-status" style="font-size:12px; color:var(--muted);"></span>
+      </div>
     </div>
+
     <div id="result-area"><div class="empty">검증을 실행하면 결과가 표시됩니다.</div></div>
     <div class="actions">
       <button class="btn btn-secondary" onclick="goStep(2)">← 파일 수정</button>
@@ -465,12 +514,18 @@ const VALID_CAT_PAIRS = {
 
 // ─── STATE ───────────────────────────────────────────────
 const S = {
-  sets: [],
+  sets: [],          // [{setCode, parts, chasu}]
   rawRows: null,
-  files: { setimg:[], png160:[], png300:[], png500:[], excel:[], unity3d:[], unknown:[] }
+  files: { setimg:[], png:[], excel:[], unity3d:[], unknown:[] }
 };
 
-// ─── 레벤슈타인 거리 ─────────────────────────────────────
+// ─── 필터 상태 ────────────────────────────────────────────
+const F = {
+  type: 'all',     // 상태/타입 필터
+  chasu: 'all',    // 차수 필터
+};
+
+// ─── 레벤슈타인 ──────────────────────────────────────────
 function levenshtein(a, b) {
   const al = a.toLowerCase(), bl = b.toLowerCase();
   const dp = Array.from({length: al.length+1}, (_,i) => i);
@@ -505,28 +560,21 @@ function findTypoSuggestion(val, validSet, maxDist = 2) {
   return null;
 }
 
-// 차수 배지 HTML 생성 헬퍼
 function chasuBadges(chasuSet) {
   return [...chasuSet].sort().map(c => `<span class="chasu-tag">${c}차</span>`).join('');
 }
 
-// ─── ★ 용량 추출 유틸 ────────────────────────────────────
-// 문자열에서 용량(숫자+단위) 추출
-// 반환: { num: float, unit: 'g'|'ml'|'l'|'oz' } 또는 null
+// ─── 용량 추출 ───────────────────────────────────────────
 function extractCapacity(str) {
   if (!str) return null;
   const s = String(str).trim();
-  // 숫자(소수점포함) + 단위 패턴 전체 추출
   const matches = s.match(/(\d+(?:\.\d+)?)\s*(ml|mL|ML|Ml|g|G|L|l(?!e)|oz|OZ|Oz)\b/g);
   if (!matches || !matches.length) return null;
-  // 마지막 용량 값을 기준으로 사용 (제품명에서 용량이 보통 뒤쪽에 위치)
   const last = matches[matches.length - 1];
   const m = last.match(/(\d+(?:\.\d+)?)\s*(ml|mL|ML|Ml|g|G|L|l(?!e)|oz|OZ|Oz)/);
   if (!m) return null;
   return { num: parseFloat(m[1]), unit: normalizeCapUnit(m[2]) };
 }
-
-// 단위 정규화: 대소문자 통일
 function normalizeCapUnit(u) {
   if (!u) return '';
   const lo = u.toLowerCase();
@@ -536,10 +584,8 @@ function normalizeCapUnit(u) {
   if (lo === 'oz') return 'oz';
   return lo;
 }
-
-// 두 용량이 같은지 비교 (단위 다르면 false)
 function capacityMatch(a, b) {
-  if (!a || !b) return true; // 어느 한쪽 없으면 검사 불가 → 무시
+  if (!a || !b) return true;
   return a.num === b.num && a.unit === b.unit;
 }
 
@@ -597,7 +643,6 @@ function runExcelQA(rows) {
   };
   const container = document.getElementById('excel-qa-container');
 
-  // 헤더 동적 스캔 — 첫 5행에서 '카테고리', '상세카테고리' 열 찾기
   let colCat = -1, colSubcat = -1, headerRowIdx = -1;
   for (let r = 0; r < Math.min(5, rows.length); r++) {
     const row = rows[r]; if (!row) continue;
@@ -619,27 +664,20 @@ function runExcelQA(rows) {
 
 // ─── 세트-부품 리스트 품질 검사 ──────────────────────────
 function runListQA(rows, cv, container) {
-  const COL_CHASU    = 2;  // C열
-  const COL_SETCODE  = 3;  // D열
-  const COL_PRODNAME = 5;  // F열 — 제품명 ★
-  const COL_CAPACITY = 6;  // G열 — 용량 ★
-  const COL_PARTCODE = 8;  // I열
+  const COL_CHASU    = 2;
+  const COL_SETCODE  = 3;
+  const COL_PRODNAME = 5;
+  const COL_CAPACITY = 6;
+  const COL_PARTCODE = 8;
 
   const VALID_CHASU = getSelectedChasu();
 
   const issues = {
-    catTypo:           [],
-    catWrong:          [],
-    subcatTypo:        [],
-    partDup:           [],
-    setDup:            [],
-    partDiff:          [],
-    layerDup:          [],
-    nameDup:           [],
-    capacityMismatch:  [],  // ★ 8번: 제품명 용량 ↔ G열 용량 불일치
+    catTypo: [], catWrong: [], subcatTypo: [],
+    partDup: [], setDup: [], partDiff: [],
+    layerDup: [], nameDup: [], capacityMismatch: [],
   };
 
-  // 헤더에서 카테고리/상세카테고리 열 탐색
   let colCat = -1, colSubcat = -1;
   if (rows[1]) {
     rows[1].forEach((v, i) => {
@@ -662,35 +700,23 @@ function runListQA(rows, cv, container) {
     if (!chasu) continue;
     if (!VALID_CHASU.has(chasu)) continue;
 
-    // ★ 8번: 제품명 vs G열 용량 불일치 검사
     const prodName  = cv(row, COL_PRODNAME);
     const gCapacity = cv(row, COL_CAPACITY);
     if (prodName && gCapacity) {
       const capFromName = extractCapacity(prodName);
       const capFromG    = extractCapacity(gCapacity);
       if (capFromName && capFromG && !capacityMatch(capFromName, capFromG)) {
-        issues.capacityMismatch.push({
-          row: r + 1,
-          chasu,
-          prodName,
-          gCapacity,
-          capFromName,
-          capFromG,
-        });
+        issues.capacityMismatch.push({ row: r + 1, chasu, prodName, gCapacity, capFromName, capFromG });
       }
     }
 
-    // 카테고리 오타 검사
     if (colCat >= 0) {
       const cat    = cv(row, colCat);
       const subcat = colSubcat >= 0 ? cv(row, colSubcat) : '';
       if (cat && !VALID_CATEGORIES.has(cat)) {
         const typo = findTypoSuggestion(cat, VALID_CATEGORIES);
-        if (typo) {
-          issues.catTypo.push({ row: r+1, chasu, cat, suggestion: typo.suggestion, typoType: typo.type });
-        } else {
-          issues.catWrong.push({ row: r+1, chasu, cat });
-        }
+        if (typo) issues.catTypo.push({ row: r+1, chasu, cat, suggestion: typo.suggestion, typoType: typo.type });
+        else      issues.catWrong.push({ row: r+1, chasu, cat });
       }
       if (subcat && !ALL_VALID_SUBCATS.has(subcat)) {
         const typo = findTypoSuggestion(subcat, ALL_VALID_SUBCATS);
@@ -710,7 +736,6 @@ function runListQA(rows, cv, container) {
     }
   }
 
-  // ③ 세트 내 부품코드 중복
   Object.entries(setMap).forEach(([setCode, entries]) => {
     const seen = {};
     entries.forEach(({row, partCode, chasu}) => {
@@ -718,13 +743,10 @@ function runListQA(rows, cv, container) {
       seen[partCode].push({ row, chasu });
     });
     Object.entries(seen).forEach(([pc, items]) => {
-      if (items.length > 1) {
-        issues.partDup.push({ setCode, partCode: pc, items });
-      }
+      if (items.length > 1) issues.partDup.push({ setCode, partCode: pc, items });
     });
   });
 
-  // ④ 도면번호 중복
   const setCodeChasuMap = {};
   for (let r = 2; r < rows.length; r++) {
     const row     = rows[r];
@@ -737,12 +759,9 @@ function runListQA(rows, cv, container) {
   }
   Object.entries(setCodeChasuMap).forEach(([setCode, entries]) => {
     const chasusUniq = [...new Set(entries.map(e => e.chasu))];
-    if (chasusUniq.length > 1) {
-      issues.setDup.push({ setCode, entries });
-    }
+    if (chasusUniq.length > 1) issues.setDup.push({ setCode, entries });
   });
 
-  // ⑤ 같은 도면번호인데 차수별 부품코드 다름
   const setCodePerChasu = {};
   let currentSet2 = null;
   for (let r = 2; r < rows.length; r++) {
@@ -771,7 +790,6 @@ function runListQA(rows, cv, container) {
     if (diffs.length > 0) issues.partDiff.push({ setCode: sc, setsArr });
   });
 
-  // ⑥ 레이어명 내 부품코드 중복 / ⑦ 부품명 중복
   {
     const COL_NAME = 13;
     let curLayer = '', curParts = [], curNames = [], curRow = -1, curChasu = '';
@@ -819,7 +837,7 @@ function renderListQAResult(issues, container) {
                 (issues.capacityMismatch||[]).length;
 
   if (total === 0) {
-    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 중복·불일치·오타·용량 항목이 발견되지 않았습니다.</div></div>`;
+    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음</div></div>`;
     return;
   }
 
@@ -832,8 +850,7 @@ function renderListQAResult(issues, container) {
     html += qaGroup('① 카테고리 오타 의심', issues.catTypo.length, 'err',
       issues.catTypo.map(({row, chasu, cat, suggestion, typoType}) => {
         const lbl = typoTypeLabel(typoType);
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [${lbl}] "${cat}" → 수정 제안: "${suggestion}"`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -847,16 +864,15 @@ function renderListQAResult(issues, container) {
 
   if (issues.catWrong.length > 0) {
     html += qaGroup('① 카테고리 알 수 없음', issues.catWrong.length, 'err',
-      issues.catWrong.map(({row, chasu, cat}) => {
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [오류] "${cat}" 은 유효한 카테고리가 아님`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+      issues.catWrong.map(({row, chasu, cat}) =>
+        `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
             <span class="badge err">오류</span> <b>"${cat}"</b> 은 유효한 카테고리가 아님
           </div>
-        </div>`;
-      }).join('')
+        </div>`
+      ).join('')
     );
   }
 
@@ -864,8 +880,7 @@ function renderListQAResult(issues, container) {
     html += qaGroup('② 상세카테고리 오타 의심', issues.subcatTypo.length, 'warn',
       issues.subcatTypo.map(({row, chasu, subcat, suggestion, typoType}) => {
         const lbl = typoTypeLabel(typoType);
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [${lbl}] "${subcat}" → 수정 제안: "${suggestion}"`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -880,11 +895,9 @@ function renderListQAResult(issues, container) {
   if (issues.partDup.length > 0) {
     html += qaGroup('③ 세트 내 부품코드 중복', issues.partDup.length, 'err',
       issues.partDup.map(({setCode, partCode, items}) => {
-        const chasuSet  = new Set(items.map(i => i.chasu).filter(Boolean));
-        const rowNums   = items.map(i => i.row).join(', ');
-        const chasuStr  = chasuSet.size ? '['+[...chasuSet].sort().join(',')+' 차]' : '';
-        const copy = `행 ${rowNums} ${chasuStr} [중복] 세트 ${setCode} 내 부품코드 ${partCode} ${items.length}회 반복`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        const chasuSet = new Set(items.map(i => i.chasu).filter(Boolean));
+        const rowNums  = items.map(i => i.row).join(', ');
+        return `<div class="qa-item">
           <span class="row-info">행 ${rowNums}</span>
           <div class="qa-detail">
             ${chasuSet.size ? chasuBadges(chasuSet) : ''}
@@ -901,8 +914,7 @@ function renderListQAResult(issues, container) {
       issues.setDup.map(({setCode, entries}) => {
         const chasuSet = new Set(entries.map(e => e.chasu).filter(Boolean));
         const detail   = entries.map(e => `${e.chasu?e.chasu+'차':'?'}(행${e.row})`).join(', ');
-        const copy = `[중복] 도면번호 ${setCode} 여러 차수에 등장: ${detail}`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item">
           <div class="qa-detail">
             ${chasuSet.size ? chasuBadges(chasuSet) : ''}
             <span class="badge warn">중복</span>
@@ -916,21 +928,16 @@ function renderListQAResult(issues, container) {
   if (issues.partDiff.length > 0) {
     html += qaGroup('⑤ 같은 도면번호인데 차수별 부품코드 다름', issues.partDiff.length, 'warn',
       issues.partDiff.map(({setCode, setsArr}) => {
-        const copyLines = [`[불일치] 도면번호 ${setCode}`];
-        setsArr.forEach(s => copyLines.push(`  ${s.chasu}차: ${[...s.parts].join(', ')}`));
-        const copy = copyLines.join('\n');
         const htmlLines = setsArr.map(s =>
           `<div style="margin:2px 0">${chasuBadges(new Set([s.chasu]))} ${[...s.parts].map(p=>`<span class="chip">${p}</span>`).join('')}</div>`
         ).join('');
         return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
             background:rgba(245,158,11,.04); border:1px solid rgba(245,158,11,.2);
-            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;">
           <div style="margin-bottom:10px;">
             <span class="badge warn">불일치</span> 도면번호 <b>${setCode}</b>
           </div>
-          <div style="padding:8px 10px; background:var(--surface2); border-radius:6px;">
-            ${htmlLines}
-          </div>
+          <div style="padding:8px 10px; background:var(--surface2); border-radius:6px;">${htmlLines}</div>
         </div>`;
       }).join('<div style="height:4px"></div>')
     );
@@ -939,19 +946,11 @@ function renderListQAResult(issues, container) {
   if (issues.layerDup && issues.layerDup.length > 0) {
     html += qaGroup('⑥ 레이어명 내 부품코드 중복', issues.layerDup.length, 'err',
       issues.layerDup.map(({layer, row, chasu, dups, allParts}) => {
-        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
-        const copyLines = [
-          `[중복] 레이어명 "${layer}" (행${row}${chasu?' '+chasu+'차':''})`,
-          `  중복 항목: ${dupList}`,
-          `  전체 목록: ${allParts.join(', ')}`
-        ];
-        const copy = copyLines.join('\n');
         const dupSet = new Set(dups.map(d => d.part));
-        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start">
           <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
-            <span class="badge err">중복</span>
-            레이어명 <b>"${layer}"</b>
+            <span class="badge err">중복</span> 레이어명 <b>"${layer}"</b>
             <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
           </div>
           <div style="margin-bottom:6px;">
@@ -960,10 +959,7 @@ function renderListQAResult(issues, container) {
           </div>
           <div>
             <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
-            ${allParts.map(p => dupSet.has(p)
-              ? `<span class="chip-dup">${p}</span>`
-              : `<span class="chip">${p}</span>`
-            ).join('')}
+            ${allParts.map(p => dupSet.has(p) ? `<span class="chip-dup">${p}</span>` : `<span class="chip">${p}</span>`).join('')}
           </div>
         </div>`;
       }).join('')
@@ -973,21 +969,13 @@ function renderListQAResult(issues, container) {
   if (issues.nameDup && issues.nameDup.length > 0) {
     html += qaGroup('⑦ 레이어명 내 부품명(N열) 중복', issues.nameDup.length, 'err',
       issues.nameDup.map(({layer, row, chasu, dups, allParts}) => {
-        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
-        const copyLines = [
-          `[중복] 레이어명 "${layer}" 부품명 중복 (행${row}${chasu?' '+chasu+'차':''})`,
-          `  중복 항목: ${dupList}`,
-          `  전체 목록: ${allParts.join(', ')}`
-        ];
-        const copy = copyLines.join('\n');
         const dupSet = new Set(dups.map(d => d.part));
         return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
             background:rgba(239,68,68,.04); border:1px solid rgba(239,68,68,.18);
-            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;">
           <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
-            <span class="badge err">중복</span>
-            레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
+            <span class="badge err">중복</span> 레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
             <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
           </div>
           <div style="margin-bottom:8px; padding:8px 10px; background:rgba(239,68,68,.08); border-radius:6px;">
@@ -996,24 +984,19 @@ function renderListQAResult(issues, container) {
           </div>
           <div style="padding:8px 10px; background:var(--surface2); border-radius:6px;">
             <span style="font-size:11px; color:var(--muted); font-weight:700; margin-right:6px;">전체 목록</span>
-            ${allParts.map(p => dupSet.has(p)
-              ? `<span class="chip-dup">${p}</span>`
-              : `<span class="chip">${p}</span>`
-            ).join('')}
+            ${allParts.map(p => dupSet.has(p) ? `<span class="chip-dup">${p}</span>` : `<span class="chip">${p}</span>`).join('')}
           </div>
         </div>`;
       }).join('<div style="height:4px"></div>')
     );
   }
 
-  // ★ 8번: 용량 불일치
   if (issues.capacityMismatch && issues.capacityMismatch.length > 0) {
     html += qaGroup('⑧ 제품명 용량 ↔ G열 용량 불일치', issues.capacityMismatch.length, 'err',
       issues.capacityMismatch.map(({row, chasu, prodName, gCapacity, capFromName, capFromG}) => {
         const nameStr = `${capFromName.num}${capFromName.unit}`;
         const gStr    = `${capFromG.num}${capFromG.unit}`;
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [용량불일치] 제품명: "${prodName}" (${nameStr}) / G열: ${gCapacity} (${gStr})`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -1038,16 +1021,13 @@ function renderListQAResult(issues, container) {
   container.innerHTML = html;
 }
 
-// ─── 카테고리/상세카테고리 품질 검사 (동적 컬럼) ──────────
+// ─── 카테고리/상세카테고리 품질 검사 ─────────────────────
 function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
   const dataStart   = headerRowIdx + 1;
   const VALID_CHASU = getSelectedChasu();
-
-  // F열(인덱스5)=제품명, G열(인덱스6)=용량 — 고정 컬럼
   const COL_PRODNAME_CAT = 5;
   const COL_CAPACITY_CAT = 6;
 
-  // 차수 컬럼 탐색
   let colChasu = 2;
   for (let c = 0; c < (rows[headerRowIdx]||[]).length; c++) {
     if (cv(rows[headerRowIdx], c) === '차수') { colChasu = c; break; }
@@ -1063,7 +1043,6 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     { pattern: /_COMPACT|_REFILL/i, cats: new Set(['PACT/POWDER']) },
   ];
 
-  // 제품코드 컬럼 탐색
   let colName = -1;
   for (let r = dataStart; r < Math.min(dataStart+30, rows.length); r++) {
     const row2 = rows[r]||[];
@@ -1074,18 +1053,11 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
   }
 
   const issues = {
-    catWrong:          [],
-    catTypo:           [],
-    subcatTypo:        [],
-    catMismatch:       [],
-    codeCatMismatch:   [],
-    layerPartMismatch: [],
-    layerDup:          [],
-    nameDup:           [],
-    capacityMismatch:  [],  // ★ 8번 추가
+    catWrong: [], catTypo: [], subcatTypo: [], catMismatch: [],
+    codeCatMismatch: [], layerPartMismatch: [], layerDup: [], nameDup: [],
+    capacityMismatch: [],
   };
 
-  // 부품코드 컬럼 탐색
   let colPartCode = -1;
   if (colName >= 0) {
     for (let r = dataStart; r < Math.min(dataStart+30, rows.length); r++) {
@@ -1098,38 +1070,31 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
-  // ── 카테고리/오타/불일치 + ★ 용량 불일치 검사 ──
   for (let r = dataStart; r < rows.length; r++) {
-    const row      = rows[r]; if (!row) continue;
-    const chasu    = cv(row, colChasu);
-    const cat      = cv(row, colCat);
-    const subcat   = cv(row, colSubcat);
-    const name     = colName >= 0 ? cv(row, colName) : '';
+    const row    = rows[r]; if (!row) continue;
+    const chasu  = cv(row, colChasu);
+    const cat    = cv(row, colCat);
+    const subcat = cv(row, colSubcat);
+    const name   = colName >= 0 ? cv(row, colName) : '';
 
     if (!cat && !subcat && !name) continue;
     if (cat && cat.toUpperCase() === 'SEED') continue;
     if (!chasu || !VALID_CHASU.has(chasu)) continue;
 
-    // ★ 8번: F열 제품명 vs G열 용량 불일치
     const prodName  = cv(row, COL_PRODNAME_CAT);
     const gCapacity = cv(row, COL_CAPACITY_CAT);
     if (prodName && gCapacity) {
       const capFromName = extractCapacity(prodName);
       const capFromG    = extractCapacity(gCapacity);
       if (capFromName && capFromG && !capacityMatch(capFromName, capFromG)) {
-        issues.capacityMismatch.push({
-          row: r + 1, chasu, prodName, gCapacity, capFromName, capFromG,
-        });
+        issues.capacityMismatch.push({ row: r + 1, chasu, prodName, gCapacity, capFromName, capFromG });
       }
     }
 
     if (cat && !VALID_CATEGORIES.has(cat)) {
       const typo = findTypoSuggestion(cat, VALID_CATEGORIES);
-      if (typo) {
-        issues.catTypo.push({ row: r+1, chasu, cat, subcat, name, suggestion: typo.suggestion, typoType: typo.type });
-      } else {
-        issues.catWrong.push({ row: r+1, chasu, cat, subcat, name });
-      }
+      if (typo) issues.catTypo.push({ row: r+1, chasu, cat, subcat, name, suggestion: typo.suggestion, typoType: typo.type });
+      else      issues.catWrong.push({ row: r+1, chasu, cat, subcat, name });
     }
 
     if (subcat && !ALL_VALID_SUBCATS.has(subcat)) {
@@ -1155,11 +1120,9 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
     }
   }
 
-  // ── 레이어 내 부품코드 불일치 + 중복 검사 ──
   const layerPartMap = {};
   let currentLayer = '', currentParts = [], currentNames = [],
       currentLayerStartRow = -1, currentLayerChasu = '';
-
   const COL_PARTNAME = 13;
 
   const flushLayer = () => {
@@ -1168,17 +1131,13 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
       const dupMap = {};
       currentParts.forEach(p => { dupMap[p] = (dupMap[p] || 0) + 1; });
       const dups = Object.entries(dupMap).filter(([, cnt]) => cnt > 1).map(([p, cnt]) => ({ part: p, count: cnt }));
-      if (dups.length) {
-        issues.layerDup.push({ layer: currentLayer, row: currentLayerStartRow, chasu: currentLayerChasu, dups, allParts: currentParts.slice() });
-      }
+      if (dups.length) issues.layerDup.push({ layer: currentLayer, row: currentLayerStartRow, chasu: currentLayerChasu, dups, allParts: currentParts.slice() });
     }
     if (currentNames.length) {
       const nm = {};
       currentNames.forEach(n => { nm[n] = (nm[n]||0)+1; });
       const dups = Object.entries(nm).filter(([,c])=>c>1).map(([n,c])=>({part:n,count:c}));
-      if (dups.length) {
-        issues.nameDup.push({ layer: currentLayer, row: currentLayerStartRow, chasu: currentLayerChasu, dups, allParts: currentNames.slice() });
-      }
+      if (dups.length) issues.nameDup.push({ layer: currentLayer, row: currentLayerStartRow, chasu: currentLayerChasu, dups, allParts: currentNames.slice() });
     }
     if (!layerPartMap[currentLayer]) layerPartMap[currentLayer] = { occurrences: [] };
     layerPartMap[currentLayer].occurrences.push({
@@ -1215,8 +1174,8 @@ function runCategoryQA(rows, cv, container, colCat, colSubcat, headerRowIdx) {
       if (occ.parts.join(',') !== ref) {
         issues.layerPartMismatch.push({
           layer,
-          firstRow:   occs[0].row, firstChasu: occs[0].chasu, firstParts: occs[0].parts,
-          diffRow:    occ.row,     diffChasu:  occ.chasu,      diffParts:  occ.parts,
+          firstRow: occs[0].row, firstChasu: occs[0].chasu, firstParts: occs[0].parts,
+          diffRow:  occ.row,     diffChasu:  occ.chasu,      diffParts:  occ.parts,
         });
       }
     });
@@ -1233,7 +1192,7 @@ function renderCategoryQAResult(issues, container) {
                 (issues.capacityMismatch||[]).length;
 
   if (total === 0) {
-    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음 — 오류·오타·불일치·중복·용량 항목이 없습니다.</div></div>`;
+    container.innerHTML = `<div class="card" style="margin-bottom:16px"><div class="notice success">✅ 엑셀 품질 검사 이상 없음</div></div>`;
     return;
   }
 
@@ -1244,9 +1203,8 @@ function renderCategoryQAResult(issues, container) {
 
   if (issues.catWrong.length > 0) {
     html += qaGroup('1. 카테고리 값이 틀린 것', issues.catWrong.length, 'err',
-      issues.catWrong.map(({row, chasu, cat, subcat, name}) => {
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [값 오류] 카테고리 "${cat}" 은 유효하지 않음 (상세: ${subcat||'-'}, 부품: ${name||'-'})`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+      issues.catWrong.map(({row, chasu, cat, subcat, name}) =>
+        `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -1254,17 +1212,16 @@ function renderCategoryQAResult(issues, container) {
             카테고리 <b>"${cat}"</b> 은 유효하지 않음
             <span style="color:var(--muted);font-size:11px"> (상세: ${subcat||'-'}, 부품: ${name||'-'})</span>
           </div>
-        </div>`;
-      }).join('')
+        </div>`
+      ).join('')
     );
   }
 
   if (issues.catTypo.length > 0) {
     html += qaGroup('2. 카테고리 오타', issues.catTypo.length, 'warn',
       issues.catTypo.map(({row, chasu, cat, subcat, name, suggestion, typoType}) => {
-        const lbl  = typoTypeLabel(typoType);
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [${lbl}] "${cat}" → 수정 제안: "${suggestion}" (상세: ${subcat||'-'}, 부품: ${name||'-'})`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        const lbl = typoTypeLabel(typoType);
+        return `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -1280,9 +1237,8 @@ function renderCategoryQAResult(issues, container) {
   if (issues.subcatTypo.length > 0) {
     html += qaGroup('2. 상세카테고리 오타', issues.subcatTypo.length, 'warn',
       issues.subcatTypo.map(({row, chasu, cat, subcat, name, suggestion, typoType}) => {
-        const lbl  = typoTypeLabel(typoType);
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [${lbl}] 상세카테고리 "${subcat}" → 수정 제안: "${suggestion}" (카테고리: ${cat||'-'}, 부품: ${name||'-'})`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        const lbl = typoTypeLabel(typoType);
+        return `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -1299,8 +1255,7 @@ function renderCategoryQAResult(issues, container) {
     html += qaGroup('3. 카테고리 ↔ 상세카테고리 불일치', issues.catMismatch.length, 'err',
       issues.catMismatch.map(({row, chasu, cat, subcat, name}) => {
         const allowed = [...(VALID_CAT_PAIRS[cat]||[])].join(', ');
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [불일치] 카테고리 "${cat}" 에 상세카테고리 "${subcat}" 은 포함되지 않음 (부품: ${name||'-'}) / 허용: ${allowed}`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -1316,17 +1271,16 @@ function renderCategoryQAResult(issues, container) {
 
   if (issues.codeCatMismatch.length > 0) {
     html += qaGroup('4. 제품코드 ↔ 카테고리 불일치', issues.codeCatMismatch.length, 'err',
-      issues.codeCatMismatch.map(({row, chasu, name, cat, expected}) => {
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [불일치] 제품코드 "${name}" 의 카테고리 "${cat}" → 기대값: "${expected}"`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+      issues.codeCatMismatch.map(({row, chasu, name, cat, expected}) =>
+        `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
             <span class="badge err">불일치</span>
             제품코드 <b>"${name}"</b> 의 카테고리 <b>"${cat}"</b> → 기대값: <b style="color:var(--ok)">"${expected}"</b>
           </div>
-        </div>`;
-      }).join('')
+        </div>`
+      ).join('')
     );
   }
 
@@ -1335,23 +1289,14 @@ function renderCategoryQAResult(issues, container) {
       issues.layerPartMismatch.map(({layer, firstRow, firstChasu, firstParts, diffRow, diffChasu, diffParts}) => {
         const missing = firstParts.filter(p => !diffParts.includes(p));
         const added   = diffParts.filter(p => !firstParts.includes(p));
-        const copyLines = [
-          `[불일치] 레이어명 "${layer}"`,
-          `  ${firstChasu?firstChasu+'차 ':''} 행${firstRow}: ${firstParts.join(', ')}`,
-          `  ${diffChasu?diffChasu+'차 ':''} 행${diffRow}: ${diffParts.join(', ')}`,
-        ];
-        if (missing.length) copyLines.push(`  누락: ${missing.join(', ')}`);
-        if (added.length)   copyLines.push(`  추가: ${added.join(', ')}`);
-        const copy = copyLines.join('\n');
         let detailHtml = '';
         if (missing.length) detailHtml += `<div style="margin:2px 0">누락: ${missing.map(p=>`<span class="chip" style="color:var(--err)">${p}</span>`).join('')}</div>`;
         if (added.length)   detailHtml += `<div style="margin:2px 0">추가: ${added.map(p=>`<span class="chip" style="color:var(--warn)">${p}</span>`).join('')}</div>`;
         return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
             background:rgba(239,68,68,.04); border:1px solid rgba(239,68,68,.18);
-            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;">
           <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <span class="badge err">불일치</span>
-            레이어명 <b>"${layer}"</b>
+            <span class="badge err">불일치</span> 레이어명 <b>"${layer}"</b>
           </div>
           <div style="padding:8px 10px; background:var(--surface2); border-radius:6px; margin-bottom:${detailHtml?'8px':'0'};">
             <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">
@@ -1372,19 +1317,11 @@ function renderCategoryQAResult(issues, container) {
   if (issues.layerDup.length > 0) {
     html += qaGroup('6. 같은 레이어명 내 부품코드 중복', issues.layerDup.length, 'err',
       issues.layerDup.map(({layer, row, chasu, dups, allParts}) => {
-        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
-        const copyLines = [
-          `[중복] 레이어명 "${layer}" (행${row}${chasu?' '+chasu+'차':''})`,
-          `  중복 항목: ${dupList}`,
-          `  전체 목록: ${allParts.join(', ')}`
-        ];
-        const copy = copyLines.join('\n');
         const dupSet = new Set(dups.map(d => d.part));
-        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item" style="flex-direction:column;align-items:flex-start">
           <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
-            <span class="badge err">중복</span>
-            레이어명 <b>"${layer}"</b>
+            <span class="badge err">중복</span> 레이어명 <b>"${layer}"</b>
             <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
           </div>
           <div style="margin-bottom:6px;">
@@ -1393,10 +1330,7 @@ function renderCategoryQAResult(issues, container) {
           </div>
           <div>
             <span style="font-size:11px; color:var(--muted); font-weight:600; margin-right:4px;">전체 목록:</span>
-            ${allParts.map(p => dupSet.has(p)
-              ? `<span class="chip-dup">${p}</span>`
-              : `<span class="chip">${p}</span>`
-            ).join('')}
+            ${allParts.map(p => dupSet.has(p) ? `<span class="chip-dup">${p}</span>` : `<span class="chip">${p}</span>`).join('')}
           </div>
         </div>`;
       }).join('')
@@ -1406,21 +1340,13 @@ function renderCategoryQAResult(issues, container) {
   if (issues.nameDup && issues.nameDup.length > 0) {
     html += qaGroup('7. 레이어명 내 부품명(N열) 중복', issues.nameDup.length, 'err',
       issues.nameDup.map(({layer, row, chasu, dups, allParts}) => {
-        const dupList  = dups.map(d => `"${d.part}" ${d.count}회`).join(', ');
-        const copyLines = [
-          `[중복] 레이어명 "${layer}" 부품명 중복 (행${row}${chasu?' '+chasu+'차':''})`,
-          `  중복 항목: ${dupList}`,
-          `  전체 목록: ${allParts.join(', ')}`
-        ];
-        const copy = copyLines.join('\n');
         const dupSet = new Set(dups.map(d => d.part));
         return `<div class="qa-item" style="flex-direction:column;align-items:flex-start;
             background:rgba(239,68,68,.04); border:1px solid rgba(239,68,68,.18);
-            border-radius:8px; padding:12px 14px; margin-bottom:10px;" data-copy="${copy.replace(/"/g,'&quot;')}">
+            border-radius:8px; padding:12px 14px; margin-bottom:10px;">
           <div style="margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
-            <span class="badge err">중복</span>
-            레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
+            <span class="badge err">중복</span> 레이어명 <b>"${layer}"</b> — 부품명(N열) 중복
             <span style="color:var(--muted);font-size:11px">(행 ${row})</span>
           </div>
           <div style="margin-bottom:8px; padding:8px 10px; background:rgba(239,68,68,.08); border-radius:6px;">
@@ -1429,24 +1355,19 @@ function renderCategoryQAResult(issues, container) {
           </div>
           <div style="padding:8px 10px; background:var(--surface2); border-radius:6px;">
             <span style="font-size:11px; color:var(--muted); font-weight:700; margin-right:6px;">전체 목록</span>
-            ${allParts.map(p => dupSet.has(p)
-              ? `<span class="chip-dup">${p}</span>`
-              : `<span class="chip">${p}</span>`
-            ).join('')}
+            ${allParts.map(p => dupSet.has(p) ? `<span class="chip-dup">${p}</span>` : `<span class="chip">${p}</span>`).join('')}
           </div>
         </div>`;
       }).join('<div style="height:4px"></div>')
     );
   }
 
-  // ★ 8번: 용량 불일치
   if (issues.capacityMismatch && issues.capacityMismatch.length > 0) {
     html += qaGroup('8. 제품명 용량 ↔ G열 용량 불일치', issues.capacityMismatch.length, 'err',
       issues.capacityMismatch.map(({row, chasu, prodName, gCapacity, capFromName, capFromG}) => {
         const nameStr = `${capFromName.num}${capFromName.unit}`;
         const gStr    = `${capFromG.num}${capFromG.unit}`;
-        const copy = `행 ${row} ${chasu?'['+chasu+'차]':''} [용량불일치] 제품명: "${prodName}" (${nameStr}) / G열: ${gCapacity} (${gStr})`;
-        return `<div class="qa-item" data-copy="${copy.replace(/"/g,'&quot;')}">
+        return `<div class="qa-item">
           <span class="row-info">행 ${row}</span>
           <div class="qa-detail">
             ${chasu ? chasuBadges(new Set([chasu])) : ''}
@@ -1471,7 +1392,6 @@ function renderCategoryQAResult(issues, container) {
   container.innerHTML = html;
 }
 
-// HTML 이스케이프 헬퍼
 function escHtml(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -1480,18 +1400,18 @@ function qaGroup(title, count, type, bodyHtml) {
   const icon = type === 'err' ? '🔴' : type === 'warn' ? '🟡' : '🔵';
   const uid  = 'qag_' + Math.random().toString(36).slice(2, 8);
   return `<div class="qa-group" id="${uid}">
-    <div class="qa-group-header" onclick="toggleQaGroup(event,'${uid}')">
+    <div class="qa-group-header" onclick="toggleQaGroup('${uid}')">
       <div class="qa-group-title">${icon} ${title}</div>
       <div style="display:flex;align-items:center;gap:8px">
         <span class="qa-group-count badge ${type}">${count}건</span>
-        <button class="copy-btn" onclick="event.stopPropagation();copyQAGroup('${uid}','${title.replace(/'/g,"\\'")}',this)" title="클립보드에 복사">📋 복사</button>
+        <button class="copy-btn" onclick="event.stopPropagation();copyQAGroup('${uid}','${title.replace(/'/g,"\\'")}',this)">📋 복사</button>
       </div>
     </div>
     <div class="qa-group-body">${bodyHtml}</div>
   </div>`;
 }
 
-function toggleQaGroup(e, uid) {
+function toggleQaGroup(uid) {
   document.getElementById(uid).classList.toggle('collapsed');
 }
 
@@ -1500,36 +1420,15 @@ function copyQAGroup(uid, title, btn) {
   const items = group.querySelectorAll('.qa-item');
   const lines = [`【${title}】`];
   items.forEach(item => {
-    const copyText = item.dataset.copy;
-    if (copyText) {
-      lines.push('  ' + copyText);
-    } else {
-      const t = item.innerText.replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
-      if (t) lines.push('  ' + t);
-    }
+    const t = item.innerText.replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
+    if (t) lines.push('  ' + t);
   });
   const text = lines.join('\n');
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.textContent;
     btn.textContent = '✅ 복사됨';
-    btn.style.background = 'rgba(34,197,94,.25)';
-    btn.style.borderColor = 'var(--ok)';
     btn.style.color = 'var(--ok)';
-    setTimeout(() => {
-      btn.textContent = orig;
-      btn.style.background = '';
-      btn.style.borderColor = '';
-      btn.style.color = '';
-    }, 1800);
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = '✅ 복사됨';
-    setTimeout(() => { btn.textContent = '📋 복사'; }, 1800);
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1800);
   });
 }
 
@@ -1540,7 +1439,7 @@ function parseListRows(rows) {
   const COL_PARTCODE = 8;
   const VALID_CHASU  = getSelectedChasu();
 
-  const sets = {}, setOrder = [];
+  const sets = {}, setOrder = [], setChasuMap = {};
   let currentSet = null;
 
   const cv = (row, col) => {
@@ -1562,14 +1461,25 @@ function parseListRows(rows) {
     if (setCode) {
       currentSet = setCode.toUpperCase();
       if (!sets[currentSet]) { sets[currentSet] = []; setOrder.push(currentSet); }
+      // 차수 수집
+      if (!setChasuMap[currentSet]) setChasuMap[currentSet] = new Set();
+      setChasuMap[currentSet].add(chasu);
     }
     if (partCode && currentSet) {
       const pc = partCode.toUpperCase();
       if (!sets[currentSet].includes(pc)) sets[currentSet].push(pc);
+      // 부품 행에서도 차수 수집
+      if (!setChasuMap[currentSet]) setChasuMap[currentSet] = new Set();
+      setChasuMap[currentSet].add(chasu);
     }
   }
 
-  S.sets = setOrder.map(setCode => ({ setCode, parts: sets[setCode] }));
+  S.sets = setOrder.map(setCode => ({
+    setCode,
+    parts:  sets[setCode],
+    chasuSet: setChasuMap[setCode] || new Set(),
+  }));
+
   const uniqueTotal = new Set(S.sets.flatMap(s => s.parts)).size;
 
   const dupeSets = [];
@@ -1591,12 +1501,13 @@ function parseListRows(rows) {
   }
 
   if (S.sets.length) {
-    html += '<div class="result-wrap"><table><thead><tr><th>세트코드</th><th>부품 목록</th><th>부품 수</th></tr></thead><tbody>';
-    S.sets.forEach(({setCode, parts}) => {
-      const hasDupe  = dupeSets.some(d => d.setCode === setCode);
-      const rowStyle = hasDupe ? ' style="background:rgba(239,68,68,.06)"' : '';
+    html += '<div class="result-wrap"><table><thead><tr><th>세트코드</th><th>차수</th><th>부품 목록</th><th>부품 수</th></tr></thead><tbody>';
+    S.sets.forEach(({setCode, parts, chasuSet}) => {
+      const hasDupe   = dupeSets.some(d => d.setCode === setCode);
+      const rowStyle  = hasDupe ? ' style="background:rgba(239,68,68,.06)"' : '';
       const dupeBadge = hasDupe ? ' <span class="badge err">중복</span>' : '';
-      html += `<tr${rowStyle}><td><b>${setCode}</b>${dupeBadge}</td><td>${parts.map(p=>`<span class="chip">${p}</span>`).join('')}</td><td>${parts.length}</td></tr>`;
+      const chasuHtml = [...chasuSet].sort().map(c=>`<span class="chasu-tag">${c}차</span>`).join('');
+      html += `<tr${rowStyle}><td><b>${setCode}</b>${dupeBadge}</td><td>${chasuHtml}</td><td>${parts.map(p=>`<span class="chip">${p}</span>`).join('')}</td><td>${parts.length}</td></tr>`;
     });
     html += '</tbody></table></div>';
   }
@@ -1607,10 +1518,11 @@ function parseListRows(rows) {
 }
 
 // ─── STEP 2 ──────────────────────────────────────────────
-const RE_SET_IMG  = /^[A-Z]\d{3,5}\.(png|jpg|jpeg)$/i;
-const RE_PART_PNG = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.(png|jpg|jpeg)$/i;
-const RE_EXCEL    = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.(xlsx|xls)$/i;
-const RE_UNITY    = /^[A-Z]\d{3,5}_[A-Z0-9_]+\.unity3d$/i;
+// 모두 /i 플래그 — 소문자 파일명도 인식
+const RE_SET_IMG  = /^[A-Za-z]\d{3,5}\.(png|jpg|jpeg)$/i;
+const RE_PART_PNG = /^[A-Za-z]\d{3,5}_[A-Za-z0-9_]+\.(png|jpg|jpeg)$/i;
+const RE_EXCEL    = /^[A-Za-z]\d{3,5}_[A-Za-z0-9_]+\.(xlsx|xls)$/i;
+const RE_UNITY    = /^[A-Za-z]\d{3,5}_[A-Za-z0-9_]+\.unity3d$/i;
 
 function getImgSize(file) {
   return new Promise(res => {
@@ -1653,12 +1565,8 @@ async function handleAllFiles(fileList) {
     const f = files[i];
     msg.textContent = `${i+1} / ${files.length}  ·  ${f.name}`;
     if (RE_SET_IMG.test(f.name))       S.files.setimg.push(f);
-    else if (RE_PART_PNG.test(f.name)) {
-      const maxPx = await getImgSize(f);
-      if (maxPx <= 160) S.files.png160.push(f);
-      else if (maxPx <= 350) S.files.png300.push(f);
-      else S.files.png500.push(f);
-    } else if (RE_EXCEL.test(f.name))  S.files.excel.push(f);
+    else if (RE_PART_PNG.test(f.name)) S.files.png.push(f);
+    else if (RE_EXCEL.test(f.name))    S.files.excel.push(f);
     else if (RE_UNITY.test(f.name))    S.files.unity3d.push(f);
     else                               S.files.unknown.push(f);
   }
@@ -1685,7 +1593,7 @@ async function handleDrop(e) {
 }
 
 function refreshBins() {
-  ['setimg','png160','png300','png500','excel','unity3d','unknown'].forEach(key => {
+  ['setimg','png','excel','unity3d','unknown'].forEach(key => {
     const arr = S.files[key];
     const cnt = document.getElementById('cnt-'+key);
     const lst = document.getElementById('bfiles-'+key);
@@ -1702,8 +1610,9 @@ function removeBin(key, idx) { S.files[key].splice(idx,1); refreshBins(); }
 
 // ─── VALIDATION ──────────────────────────────────────────
 const FTYPES = [
-  {key:'png160',label:'PNG160'},{key:'png300',label:'PNG300'},{key:'png500',label:'PNG500'},
-  {key:'excel',label:'EXCEL'},{key:'unity3d',label:'UNITY3D'},
+  {key:'png', label:'PNG'},
+  {key:'excel', label:'EXCEL'},
+  {key:'unity3d', label:'UNITY3D'},
 ];
 
 function codeFromFile(f) {
@@ -1748,13 +1657,14 @@ async function runValidation() {
   })));
 
   const results = [];
-  S.sets.forEach(({setCode, parts}) => {
+  S.sets.forEach(({setCode, parts, chasuSet}) => {
     const pfx = (setCode.match(/^([A-Z]\d{3,5})/i)||[])[1]?.toUpperCase();
     const hasSetImg = !!(setImgMap[pfx]||setImgMap[setCode.toUpperCase()]);
     parts.forEach(partCode => {
       const pKey   = partCode.toUpperCase();
       const pFiles = lookup[pKey]||{};
       const ex     = excelData[pKey]||null;
+
       const fnIssues = [];
       FTYPES.forEach(({key}) => {
         if (pFiles[key] && !pFiles[key].name.toUpperCase().startsWith(pKey)) fnIssues.push(`${key} 파일명 불일치`);
@@ -1763,13 +1673,26 @@ async function runValidation() {
         const exCode = codeFromFile(pFiles.excel);
         if (exCode !== pKey) fnIssues.push(`excel 파일명 코드 불일치 (${pFiles.excel.name})`);
       }
+
+      // ★ 엑셀 파일 없을 때 "파일 없음" 명시
+      let excelErrors   = ex?.errors   || [];
+      let excelWarnings = ex?.warnings || [];
+      const excelMissing = !pFiles.excel; // 파일 자체가 없는 경우
+
+      // 업로드된 파일 종류 계산 (세트이미지 제외, 부품 파일만)
+      const uploadedTypes = FTYPES.filter(t => pFiles[t.key]).map(t => t.key);
+      const hasAnyUpload  = uploadedTypes.length > 0;
+
       results.push({
-        setCode, partCode, hasSetImg,
-        files: Object.fromEntries(FTYPES.map(({key})=>[key,!!pFiles[key]])),
-        excelErrors:   ex?.errors   ||(pFiles.excel?[]:[]),
-        excelWarnings: ex?.warnings ||[],
-        nasaVals: ex?.nasaVals||null,
-        fnIssues
+        setCode, partCode, hasSetImg, chasuSet,
+        files:          Object.fromEntries(FTYPES.map(({key})=>[key,!!pFiles[key]])),
+        excelErrors,
+        excelWarnings,
+        excelMissing,
+        nasaVals:       ex?.nasaVals||null,
+        fnIssues,
+        hasAnyUpload,
+        uploadedTypes,
       });
     });
   });
@@ -1779,13 +1702,124 @@ async function runValidation() {
   document.getElementById('tab1').classList.add('done');
   document.getElementById('tab2').classList.add('done');
   window._results = results;
+
+  // ★ 차수 필터 버튼 동적 생성
+  buildChasuFilterButtons(results);
+
   document.getElementById('result-toolbar').style.display = 'flex';
-  window._activeFilter = 'all';
-  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('fb-all').classList.add('active');
-  updateFilterStatus();
+  F.type = 'all'; F.chasu = 'all';
+  syncFilterUI();
+  applyFilters();
 }
 
+// ─── 차수 필터 버튼 빌드 ─────────────────────────────────
+function buildChasuFilterButtons(results) {
+  const allChasus = new Set();
+  results.forEach(r => {
+    if (r.chasuSet) r.chasuSet.forEach(c => allChasus.add(c));
+  });
+  const sorted = [...allChasus].sort();
+
+  const row = document.getElementById('chasu-filter-row');
+  // 기존 동적 버튼 제거 (전체 버튼 제외)
+  [...row.querySelectorAll('.chasu-filter-btn:not(#cfb-all)')].forEach(b => b.remove());
+
+  if (sorted.length > 0) {
+    row.style.display = 'flex';
+    sorted.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'chasu-filter-btn';
+      btn.id = `cfb-${c}`;
+      btn.textContent = `${c}차`;
+      btn.onclick = () => setChasuFilter(c);
+      row.appendChild(btn);
+    });
+  } else {
+    row.style.display = 'none';
+  }
+}
+
+// ─── 필터 로직 ───────────────────────────────────────────
+function setTypeFilter(type) {
+  F.type = type;
+  syncFilterUI();
+  applyFilters();
+}
+
+function setChasuFilter(chasu) {
+  F.chasu = chasu;
+  syncFilterUI();
+  applyFilters();
+}
+
+function syncFilterUI() {
+  // 상태 필터 버튼
+  const typeIds = ['all','err','setimg','png','excel','unity3d','nasa','uploaded','no-upload'];
+  typeIds.forEach(id => {
+    const btn = document.getElementById('fb-'+id);
+    if (!btn) return;
+    btn.className = 'filter-btn';
+    if (F.type === id) {
+      if (['err','setimg','png160','png300','png500','excel','unity3d'].includes(id)) btn.classList.add('active-err');
+      else if (id === 'nasa') btn.classList.add('active-warn');
+      else if (['uploaded'].includes(id)) btn.classList.add('active-ok');
+      else if (['no-upload'].includes(id)) btn.classList.add('active-warn');
+      else btn.classList.add('active');
+    }
+  });
+
+  // 차수 필터 버튼
+  document.querySelectorAll('.chasu-filter-btn').forEach(btn => {
+    btn.classList.remove('active');
+    const val = btn.id === 'cfb-all' ? 'all' : btn.id.replace('cfb-', '');
+    if (F.chasu === val) btn.classList.add('active');
+  });
+}
+
+function applyFilters() {
+  const cards = document.querySelectorAll('.result-card');
+  let shown = 0;
+  cards.forEach(el => {
+    const typeOk  = checkTypeFilter(el, F.type);
+    const chasuOk = checkChasuFilter(el, F.chasu);
+    const hide    = !(typeOk && chasuOk);
+    el.classList.toggle('filter-hidden', hide);
+    if (!hide) shown++;
+  });
+  updateFilterStatus(shown, cards.length);
+}
+
+function checkTypeFilter(el, type) {
+  if (type === 'all')       return true;
+  if (type === 'err')       return el.classList.contains('has-error');
+  if (type === 'uploaded')  return el.dataset.hasUpload === 'true';
+  if (type === 'no-upload') return el.dataset.hasUpload === 'false';
+  // missing type filter
+  return (el.dataset.missing||'').split(' ').includes(type);
+}
+
+function checkChasuFilter(el, chasu) {
+  if (chasu === 'all') return true;
+  const cardChasus = (el.dataset.chasus || '').split(',').filter(Boolean);
+  return cardChasus.includes(chasu);
+}
+
+function updateFilterStatus(shown, total) {
+  const st = document.getElementById('filter-status'); if (!st) return;
+  const typeLabels = {
+    all:'전체', err:'오류 있는 세트', setimg:'세트이미지 없는 세트',
+    png:'PNG 없는 세트',
+    excel:'엑셀 없는 세트', unity3d:'Unity3D 없는 세트', nasa:'나사값 불일치 세트',
+    uploaded:'업로드 파일 있는 세트', 'no-upload':'파일 없는 세트',
+  };
+  const tLabel = typeLabels[F.type] || F.type;
+  const cLabel = F.chasu === 'all' ? '' : ` · ${F.chasu}차`;
+  st.textContent = F.type === 'all' && F.chasu === 'all'
+    ? `전체 ${total}개 세트`
+    : `${tLabel}${cLabel} — ${shown} / ${total}개 표시 중`;
+}
+
+// ─── RENDER RESULTS ──────────────────────────────────────
 function checkExcel(code, rows) {
   const errors = [], warnings = [];
   const CODE_PAT = /^[A-Z]\d{3,5}_/i;
@@ -1832,6 +1866,13 @@ function renderResults(results) {
     const anyErr = parts.some(r => FTYPES.some(t=>!r.files[t.key])||r.excelErrors.length||!r.hasSetImg||r.fnIssues.length);
     const badge  = anyErr ? '<span class="badge err">✗ 오류</span>' : '<span class="badge ok">✓ 완료</span>';
 
+    // ★ 세트 차수 뱃지
+    const setChasus = parts[0]?.chasuSet ? [...parts[0].chasuSet].sort() : [];
+    const setChausHtml = setChasus.map(c => `<span class="set-chasu-badge">${c}차</span>`).join('');
+
+    // ★ 업로드 파일 유무 (세트 단위 — 부품 중 하나라도 업로드된 파일 있으면 true)
+    const hasAnyUploadInSet = parts.some(r => r.hasAnyUpload);
+
     const nasaLabels = {
       inner_san:'내측-나사산수',inner_jul:'내측-나사줄수',
       outer1_san:'외측1단-나사산수',outer1_jul:'외측1단-나사줄수',
@@ -1845,10 +1886,18 @@ function renderResults(results) {
 
     const missingTypes = [];
     if (!parts[0].hasSetImg) missingTypes.push('setimg');
-    ['png160','png300','png500','excel','unity3d'].forEach(k => { if(parts.some(r=>!r.files[k])) missingTypes.push(k); });
+    ['png','excel','unity3d'].forEach(k => { if(parts.some(r=>!r.files[k])) missingTypes.push(k); });
     if (nasaDiffs.length) missingTypes.push('nasa');
 
-    html += `<div class="card ${anyErr?'result-card has-error':'result-card no-error'}" data-missing="${missingTypes.join(' ')}"><h3>${setCode} ${badge}</h3>`;
+    // data-chasus: 차수 목록 (필터용)
+    const chasuDataAttr = setChasus.join(',');
+
+    html += `<div class="card result-card ${anyErr?'has-error':'no-error'}"
+      data-missing="${missingTypes.join(' ')}"
+      data-has-upload="${hasAnyUploadInSet}"
+      data-chasus="${chasuDataAttr}">`;
+
+    html += `<h3>${setCode} ${badge} ${setChausHtml}</h3>`;
 
     const pfx = (setCode.match(/^([A-Z]\d{3,5})/)||[])[1];
     html += parts[0].hasSetImg
@@ -1863,24 +1912,35 @@ function renderResults(results) {
       html += `</div>`;
     }
 
+    // ★ 업로드 파일 현황 안내
+    if (!hasAnyUploadInSet) {
+      html += `<div class="notice warning" style="margin-bottom:10px">📭 이 세트에 업로드된 파일이 없습니다.</div>`;
+    }
+
     html += `<div class="result-wrap"><table><thead><tr>
-      <th>부품코드</th><th>PNG160</th><th>PNG300</th><th>PNG500</th>
+      <th>부품코드</th><th>PNG</th>
       <th>EXCEL</th><th>UNITY3D</th><th>파일명</th><th>엑셀 내용</th>
     </tr></thead><tbody>`;
 
     parts.forEach(r => {
       html += `<tr><td><b>${r.partCode}</b></td>`;
       FTYPES.forEach(({key}) => {
-        html += r.files[key]?`<td><span class="badge ok">✓</span></td>`:`<td><span class="badge err">✗</span></td>`;
+        html += r.files[key]
+          ? `<td><span class="badge ok">✓</span></td>`
+          : `<td><span class="badge err">✗ 없음</span></td>`;
       });
       html += r.fnIssues.length
         ? `<td><span class="badge warn" title="${r.fnIssues.join('\n')}">형식이상</span></td>`
         : `<td><span class="badge ok">정상</span></td>`;
-      if (!r.excelErrors.length&&!r.excelWarnings.length) {
-        html += `<td><span class="badge ok">정상</span></td>`;
+
+      // ★ 엑셀 내용 칸: 파일 없음 / 오류 / 경고 / 정상 명확히 구분
+      if (r.excelMissing) {
+        html += `<td><span class="badge muted">— 파일 없음</span></td>`;
+      } else if (!r.excelErrors.length && !r.excelWarnings.length) {
+        html += `<td><span class="badge ok">✓ 내용 정상</span></td>`;
       } else {
         html += `<td>`;
-        r.excelErrors.forEach(e  => { html += `<span class="badge err"  style="display:block;margin:1px 0">${e}</span>`; });
+        r.excelErrors.forEach(e   => { html += `<span class="badge err"  style="display:block;margin:1px 0">${e}</span>`; });
         r.excelWarnings.forEach(w => { html += `<span class="badge warn" style="display:block;margin:1px 0">${w}</span>`; });
         html += `</td>`;
       }
@@ -1892,43 +1952,25 @@ function renderResults(results) {
   document.getElementById('result-area').innerHTML = html;
 }
 
-function setFilter(type) {
-  window._activeFilter = type;
-  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('fb-'+type)?.classList.add('active');
-  document.querySelectorAll('.result-card').forEach(el => {
-    let hide = false;
-    if (type==='all') hide=false;
-    else if (type==='err') hide=el.classList.contains('no-error');
-    else hide=!(el.dataset.missing||'').split(' ').includes(type);
-    el.classList.toggle('filter-hidden', hide);
-  });
-  updateFilterStatus();
-}
-
-function updateFilterStatus() {
-  const total = document.querySelectorAll('.result-card').length;
-  const shown = document.querySelectorAll('.result-card:not(.filter-hidden)').length;
-  const st = document.getElementById('filter-status'); if (!st) return;
-  const labels = {all:'전체',err:'오류 있는 세트',setimg:'세트이미지 없는 세트',png160:'PNG160 없는 세트',png300:'PNG300 없는 세트',png500:'PNG500 없는 세트',excel:'엑셀 없는 세트',unity3d:'Unity3D 없는 세트',nasa:'나사값 불일치 세트'};
-  const f = window._activeFilter||'all';
-  st.textContent = f==='all' ? `전체 ${total}개 세트` : `${labels[f]} ${shown} / ${total}개`;
-}
-
 function exportReport() {
   const results = window._results;
   if (!results) { alert('검증 결과가 없습니다.'); return; }
-  const rows = [['세트코드','부품코드','세트이미지','PNG160','PNG300','PNG500','EXCEL','UNITY3D','파일명','엑셀오류','엑셀경고']];
+  const rows = [['세트코드','차수','부품코드','세트이미지','PNG','EXCEL','UNITY3D','파일명','엑셀오류','엑셀경고']];
   results.forEach(r => {
-    rows.push([r.setCode,r.partCode,r.hasSetImg?'O':'X(없음)',
-      r.files.png160?'O':'X',r.files.png300?'O':'X',r.files.png500?'O':'X',
-      r.files.excel?'O':'X',r.files.unity3d?'O':'X',
+    const chasuStr = r.chasuSet ? [...r.chasuSet].sort().join('/') : '-';
+    rows.push([
+      r.setCode, chasuStr, r.partCode,
+      r.hasSetImg?'O':'X(없음)',
+      r.files.png?'O':'X',
+      r.files.excel?'O':'X(없음)', r.files.unity3d?'O':'X',
       r.fnIssues.length?r.fnIssues.join(' | '):'O',
-      r.excelErrors.join(' | ')||'-',r.excelWarnings.join(' | ')||'-']);
+      r.excelMissing ? '파일없음' : (r.excelErrors.join(' | ')||'-'),
+      r.excelWarnings.join(' | ')||'-'
+    ]);
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = Array(11).fill({wch:22});
+  ws['!cols'] = Array(10).fill({wch:22});
   XLSX.utils.book_append_sheet(wb, ws, '검증결과');
   XLSX.writeFile(wb, `validation_report_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
